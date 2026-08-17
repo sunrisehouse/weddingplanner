@@ -304,3 +304,13 @@ h1.ob-q { font-size: 24px; line-height: 1.42; margin: 40px 0 0; letter-spacing: 
 .row.withhint .k em { font-style: normal; font-size: 11px; color: var(--mute); line-height: 1.5; }
 .row.withhint .seg { flex: none; }
 .row.withhint input[type='date'] { flex: none; width: auto; }
+
+/* 후보 한 장 — 기록 카드 + 확정 버튼 */
+.cand + .cand { border-top: 1px solid var(--line-soft); }
+.cand .venue { padding-bottom: 10px; }
+.cand .pick {
+  display: block; width: 100%; text-align: left;
+  padding: 0 18px 14px; font-size: 11.5px;
+}
+.venue .sum em { font-style: normal; font-weight: 400; font-size: 11px; color: var(--mute); }
+.chip.on { background: var(--rose-bg); color: var(--rose); }

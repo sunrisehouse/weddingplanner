@@ -12,9 +12,11 @@ const KEY = 'weddingplanner.v1';
 // 미계약이면 달만 알고, 그때 ceremonyDate는 비워 둔다.
 const emptyProfile = () => ({
   venueStatus: null,          // 웨딩홀 — 이 답이 예식일 정밀도를 정한다
+  pickedVenueId: null,        // 예약을 확정한 웨딩홀
   ceremonyDate: '',           // YYYY-MM-DD (계약 후 확정)
   ceremonyMonth: '',          // YYYY-MM (미계약 · 예상 시기)
   sdmStatus: null,            // 스드메 (웨딩패키지)
+  pickedSdmId: null,          // 계약을 확정한 스드메 업체
   honeymoonStatus: null,      // 허니문
   honsuStatus: null,          // 혼수
   onboardedAt: null,
@@ -26,12 +28,12 @@ const LEGACY = { contracted: 'done', touring: 'looking' };
 // 항목별 기록. 웨딩홀은 여러 곳을 비교하니 venues 배열로 따로 있고,
 // 스드메 · 허니문 · 혼수는 한 벌씩이라 여기 담는다.
 const emptyPlan = () => ({
+  // 계약 후에 의미가 생기는 것들. 후보별 견적은 sdmVendors에 있다.
   sdm: {
     shootDate: '',      // 촬영일 — 예식일과 별개 기준일
     dressTour: '',
     shootFitting: '',
     mainFitting: '',
-    extras: {},         // 별도 항목 확인 여부
     memo: '',
   },
   honeymoon: {
@@ -43,7 +45,12 @@ const emptyPlan = () => ({
 });
 
 const empty = () => ({
-  version: 1, venues: [], profile: emptyProfile(), plan: emptyPlan(), updatedAt: null,
+  version: 1,
+  venues: [],        // 웨딩홀 후보
+  sdmVendors: [],    // 스드메 후보
+  profile: emptyProfile(),
+  plan: emptyPlan(),
+  updatedAt: null,
 });
 
 // 중첩된 칸이라 얕은 병합으로는 새 필드가 안 채워진다
@@ -51,7 +58,7 @@ function fillPlan(saved) {
   const base = emptyPlan();
   const p = saved ?? {};
   return {
-    sdm: { ...base.sdm, ...(p.sdm ?? {}), extras: { ...(p.sdm?.extras ?? {}) } },
+    sdm: { ...base.sdm, ...(p.sdm ?? {}) },
     honeymoon: { ...base.honeymoon, ...(p.honeymoon ?? {}) },
     honsu: { ...(p.honsu ?? {}) },
   };
@@ -75,6 +82,7 @@ function read() {
     if (data?.version !== 1 || !Array.isArray(data.venues)) return empty();
     data.profile = migrate({ ...emptyProfile(), ...(data.profile ?? {}) });
     data.plan = fillPlan(data.plan);
+    if (!Array.isArray(data.sdmVendors)) data.sdmVendors = [];
     return data;
   } catch {
     return empty();
@@ -155,6 +163,45 @@ export const store = {
 
   remove(id) {
     state.venues = state.venues.filter((v) => v.id !== id);
+    if (state.profile.pickedVenueId === id) {
+      state.profile = { ...state.profile, pickedVenueId: null, venueStatus: 'looking' };
+    }
+    commit();
+  },
+
+  // ── 스드메 후보 ──────────────────────────────────────────────────────
+  sdmVendors: () => state.sdmVendors,
+  sdmVendor: (id) => state.sdmVendors.find((v) => v.id === id) ?? null,
+
+  saveSdm(v) {
+    const i = state.sdmVendors.findIndex((x) => x.id === v.id);
+    if (i === -1) state.sdmVendors.push(v);
+    else state.sdmVendors[i] = v;
+    commit();
+    return v;
+  },
+
+  removeSdm(id) {
+    state.sdmVendors = state.sdmVendors.filter((v) => v.id !== id);
+    if (state.profile.pickedSdmId === id) {
+      state.profile = { ...state.profile, pickedSdmId: null, sdmStatus: 'looking' };
+    }
+    commit();
+  },
+
+  // ── 비교 → 예약 확정 ─────────────────────────────────────────────────
+  // 확정하면 진행 상태가 같이 넘어간다. 두 곳에 따로 적게 하지 않는다.
+  pick(kind, id) {
+    state.profile = kind === 'venue'
+      ? { ...state.profile, pickedVenueId: id, venueStatus: 'done' }
+      : { ...state.profile, pickedSdmId: id, sdmStatus: 'done' };
+    commit();
+  },
+
+  unpick(kind) {
+    state.profile = kind === 'venue'
+      ? { ...state.profile, pickedVenueId: null, venueStatus: 'looking' }
+      : { ...state.profile, pickedSdmId: null, sdmStatus: 'looking' };
     commit();
   },
 
@@ -195,6 +242,7 @@ export const store = {
     }
     data.profile = migrate({ ...emptyProfile(), ...(data.profile ?? {}) });
     data.plan = fillPlan(data.plan);
+    if (!Array.isArray(data.sdmVendors)) data.sdmVendors = [];
     state = data;
     commit();
   },
@@ -337,8 +385,30 @@ export function prepStatus(profile) {
 //    단계별 소요시간 · 벌수 → docs/02-schedule.md (일정표 인쇄면)
 //    새 항목이나 금액을 추측해서 넣지 말 것.
 
+// 스드메 후보 한 곳
+export const blankSdm = () => ({
+  id: uid(),
+  name: '',
+  consultDate: '',
+  packagePrice: null,   // 패키지(계약) 금액
+  shootDress: null,     // 촬영 드레스 벌수
+  mainDress: null,      // 본식 드레스 벌수
+  album: '',            // 앨범 · 액자 구성
+  extras: {},           // 별도 항목별 금액 (모르면 비움)
+  memo: '',
+});
+
+// 패키지에 들어 있는 구성 (체크리스트 인쇄면)
+export const SDM_PACKAGE = [
+  ['스튜디오', '촬영 · 20p 앨범 1권 + 20R 액자'],
+  ['드레스 (촬영)', '신부 화이트 3벌 / 신랑 턱시도'],
+  ['드레스 (본식)', '신부 화이트 1벌 / 신랑 턱시도'],
+  ['헤어 & 메이크업', '촬영 · 본식 각 1회 (신랑 · 신부)'],
+  ['부케', '부케 1 · 부토니아 1 · 코사지 6'],
+];
+
 // 계약서에 인쇄된 '별도' 항목. 계약 금액에 포함되지 않는다.
-// 금액은 업체마다 달라서 앱이 제시하지 않는다 — 확인했는지만 기록한다.
+// 앱이 금액을 제시하지 않는다 — 업체에서 받은 금액을 직접 적는다.
 export const SDM_EXTRAS = [
   ['origin', '원본 데이터', '스튜디오 · 별도 구입'],
   ['retouch', '선수정본', '스튜디오'],
@@ -365,6 +435,22 @@ export const SDM_FINAL_PCT = 20;
 export const SDM_MID_DAYS = 60;      // 촬영 60일 전 중도금
 export const SDM_FINAL_DAYS = 60;    // 본식 60일 전 잔금
 export const SDM_PENALTY_DAYS = 90;  // 촬영일 기준 90일 이내 변경·취소 시 위약금
+
+// 실제 예상 = 패키지 금액 + 적어둔 별도 비용.
+// 자료의 요지가 "계약 총액만 보면 실제 지출을 알 수 없다"는 것이다.
+export function sdmTotal(v) {
+  const p = v?.packagePrice;
+  const hasPackage = !(p === null || p === '' || p === undefined);
+  let sum = hasPackage ? Number(p) : 0;
+  let missing = hasPackage ? 0 : 1;
+  let extraSum = 0;
+  for (const [k] of SDM_EXTRAS) {
+    const x = v?.extras?.[k];
+    if (x === null || x === '' || x === undefined) missing += 1;
+    else { extraSum += Number(x); sum += Number(x); }
+  }
+  return { ok: hasPackage, sum, extraSum, missing };
+}
 
 // 촬영일에서 나오는 날짜들. 촬영일이 없으면 계산하지 않는다.
 export function sdmDates(plan, profile) {

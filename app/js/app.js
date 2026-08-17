@@ -1,8 +1,8 @@
 import {
-  store, blankVenue, total,
+  store, blankVenue, blankSdm, total,
   daysToCeremony, monthsToCeremony, ceremonyAnchor, prepStatus,
-  SDM_EXTRAS, SDM_STEPS, SDM_MID_PCT, SDM_FINAL_PCT,
-  SDM_MID_DAYS, SDM_FINAL_DAYS, SDM_PENALTY_DAYS, sdmDates,
+  SDM_PACKAGE, SDM_EXTRAS, SDM_STEPS, SDM_MID_PCT, SDM_FINAL_PCT,
+  SDM_MID_DAYS, SDM_FINAL_DAYS, SDM_PENALTY_DAYS, sdmDates, sdmTotal,
   HONEYMOON_COSTS, honeymoonTotal, HONSU_ITEMS,
 } from './store.js';
 import { photos } from './photos.js';
@@ -529,19 +529,109 @@ function homeView() {
 }
 
 // ── 스드메 ──────────────────────────────────────────────────────────────
-// 자료의 핵심은 "촬영일이 예식일과 별개의 기준일"이라는 것이다.
-// 위약금과 중도금이 촬영일에 걸리므로 촬영일을 가장 앞에 둔다.
+// 단계가 있다. 알아보기 → 업체 비교 → 계약 확정.
+// 화면이 단계마다 달라진다 — 비교는 계약 전에, 촬영일·결제는 계약 후에 쓴다.
 function sdmView() {
   const p = store.profile();
-  const s = store.plan('sdm');
-  const d = sdmDates(s, p);
-  const checked = SDM_EXTRAS.filter(([k]) => s.extras[k]).length;
+  const list = store.sdmVendors();
+  const picked = p.pickedSdmId ? store.sdmVendor(p.pickedSdmId) : null;
 
-  app.innerHTML = `
+  const head = `
     ${brand('스드메')}
     <p class="sub">스튜디오 · 드레스 · 헤어메이크업 · 부케</p>
-    <div style="height:18px"></div>
+    <div style="height:18px"></div>`;
+
+  if (picked) return sdmContracted(head, p, picked, list);
+  if (list.length) return sdmCompare(head, list);
+  return sdmIntro(head);
+}
+
+// 1단계 — 아직 안 알아봤을 때. 상담에서 확인할 것을 먼저 알려준다.
+function sdmIntro(head) {
+  app.innerHTML = `
+    ${head}
     ${statusCard('sdmStatus')}
+
+    <h2 class="section-title">패키지에 들어 있는 것</h2>
+    <div class="card">
+      ${SDM_PACKAGE.map(([label, hint]) => `
+        <div class="row withhint">
+          <span class="k"><b>${label}</b><em>${esc(hint)}</em></span>
+        </div>`).join('')}
+    </div>
+    <p class="note">업체마다 구성이 달라요. 상담에서 받은 구성을 그대로 적어두시면 나란히 비교해드려요.</p>
+
+    <h2 class="section-title">상담에서 꼭 물어볼 것
+      <span class="hint">계약 금액 밖 ${SDM_EXTRAS.length}개</span>
+    </h2>
+    <div class="card">
+      ${SDM_EXTRAS.map(([, label, hint]) => `
+        <div class="row withhint">
+          <span class="k"><b>${label}</b><em>${esc(hint)}</em></span>
+        </div>`).join('')}
+    </div>
+    <p class="note">
+      계약 총액만 보면 실제 지출을 알 수 없어요. <b>이 ${SDM_EXTRAS.length}개를 다 물어봐야</b>
+      업체끼리 제대로 비교됩니다.
+    </p>
+
+    <div class="sticky">
+      <button class="btn btn-primary" id="add">업체 기록 시작하기</button>
+    </div>
+    ${tabBar('sdm')}
+  `;
+  $('#add').onclick = () => (location.hash = '#/sdm/new');
+  bindStatus();
+  bindChrome();
+}
+
+// 2단계 — 업체 비교. 여기서 계약을 확정한다.
+function sdmCompare(head, list) {
+  app.innerHTML = `
+    ${head}
+    ${statusCard('sdmStatus')}
+
+    <h2 class="section-title">받은 견적
+      <span class="hint">${list.length}곳</span>
+    </h2>
+    <div class="card">${list.map(sdmCard).join('')}</div>
+    <button class="btn btn-ghost" id="add" style="margin-top:14px">＋ 업체 기록하기</button>
+
+    ${list.length >= 2
+      ? sdmTable(list)
+      : '<p class="note">한 곳 더 적으면 <b>비교표</b>가 나타납니다.</p>'}
+
+    <p class="note">
+      <b>실제 예상</b>은 패키지 금액에 적어두신 별도 비용을 더한 값이에요.
+      적어두신 것만 더하고, 시세나 평균가는 알려드리지 않아요.
+    </p>
+    ${tabBar('sdm')}
+  `;
+  $('#add').onclick = () => (location.hash = '#/sdm/new');
+  bindStatus();
+  bindPick('sdm');
+  bindChrome();
+}
+
+// 3단계 — 계약 확정. 촬영일이 기준이 되고 결제·위약금 날짜가 나온다.
+function sdmContracted(head, p, picked, list) {
+  const s = store.plan('sdm');
+  const d = sdmDates(s, p);
+  const t = sdmTotal(picked);
+  const others = list.filter((v) => v.id !== picked.id);
+
+  app.innerHTML = `
+    ${head}
+    <div class="card notice ok">
+      <p><b>${esc(picked.name || '이름 없는 업체')}</b>와 계약하셨어요.</p>
+      <p>실제 예상 ${t.ok ? won(t.sum) + '원' : '금액 미입력'}${
+        t.missing ? ` · 별도 ${t.missing}개 미입력` : ''
+      }</p>
+      <div class="btn-row">
+        <button class="btn btn-quiet" data-go-sdm="${picked.id}">계약 내용 보기</button>
+        <button class="btn btn-quiet" data-unpick="sdm">다시 비교하기</button>
+      </div>
+    </div>
 
     <h2 class="section-title">촬영일
       <span class="hint">예식일과 별개 기준일</span>
@@ -574,28 +664,31 @@ function sdmView() {
       ${SDM_STEPS.map(([k, label, hint]) => dateRow(k, label, s[k], hint)).join('')}
     </div>
 
-    <h2 class="section-title">계약 금액 밖의 항목
-      <span class="hint">${checked} / ${SDM_EXTRAS.length} 확인</span>
-    </h2>
+    <h2 class="section-title">계약 금액 밖의 항목</h2>
     <div class="card">
-      ${SDM_EXTRAS.map(([k, label, hint]) => `
-        <div class="row withhint">
-          <span class="k"><b>${label}</b><em>${esc(hint)}</em></span>
-          <span class="seg" data-extra="${k}">
-            <button type="button" data-v="1" aria-pressed="${Boolean(s.extras[k])}">확인</button>
-            <button type="button" data-v="" aria-pressed="${!s.extras[k]}">아직</button>
-          </span>
-        </div>`).join('')}
+      ${SDM_EXTRAS.map(([k, label]) => {
+        const v = picked.extras?.[k];
+        const has = !(v === null || v === '' || v === undefined);
+        return `<div class="row">
+          <span class="k">${label}</span>
+          <span class="v${has ? '' : ' none'}">${has ? won(v) + '원' : '미입력'}</span>
+        </div>`;
+      }).join('')}
     </div>
     <p class="note">
-      계약 총액만 보면 실제 지출을 알 수 없어요. <b>별도 항목이 ${SDM_EXTRAS.length}개</b>예요.
-      금액은 업체·시기마다 달라서 알려드리지 않아요 — 계약서에서 직접 확인하세요.
+      금액을 고치시려면 <button class="linkish" data-go-sdm="${picked.id}">계약 내용</button>에서 적어주세요.
     </p>
+
+    ${others.length ? `
+      <h2 class="section-title">비교했던 곳
+        <span class="hint">${others.length}곳</span>
+      </h2>
+      <div class="card">${others.map(sdmCard).join('')}</div>` : ''}
 
     <h2 class="section-title">메모</h2>
     <div class="card">
       <div class="row" style="display:block">
-        <textarea data-memo placeholder="업체, 담당 플래너, 상담에서 들은 것 …">${esc(s.memo)}</textarea>
+        <textarea data-memo placeholder="담당 플래너, 전달받은 것 …">${esc(s.memo)}</textarea>
       </div>
     </div>
     ${tabBar('sdm')}
@@ -604,18 +697,235 @@ function sdmView() {
   app.querySelectorAll('[data-date]').forEach((el) => {
     el.onchange = () => { store.setPlan('sdm', { [el.dataset.date]: el.value }); render(); };
   });
-  app.querySelectorAll('[data-extra]').forEach((seg) => {
-    seg.querySelectorAll('button').forEach((b) => {
-      b.onclick = () => {
-        store.setPlan('sdm', { extras: { ...s.extras, [seg.dataset.extra]: Boolean(b.dataset.v) } });
-        render();
-      };
-    });
-  });
   const memo = app.querySelector('[data-memo]');
   memo.oninput = () => store.setPlan('sdm', { memo: memo.value });
-  bindStatus();
+  bindPick('sdm');
   bindChrome();
+}
+
+// 후보 한 장
+function sdmCard(v) {
+  const t = sdmTotal(v);
+  const p = store.profile();
+  const isPicked = p.pickedSdmId === v.id;
+  return `
+    <div class="cand">
+      <button class="venue" data-go-sdm="${v.id}">
+        <div class="name">${esc(v.name || '이름 없는 업체')}${
+          isPicked ? ' <span class="chip on">계약</span>' : ''
+        }</div>
+        <div class="meta">${
+          v.consultDate ? esc(dateLabel(v.consultDate)) + ' 상담' : '상담 날짜 미입력'
+        }</div>
+        <div class="sum${t.ok ? '' : ' none'}">${
+          t.ok ? won(t.sum) + '원' : '패키지 금액 미입력'
+        }${t.ok && t.missing ? ` <em>별도 ${t.missing}개 미입력</em>` : ''}</div>
+      </button>
+      ${isPicked ? '' : `
+        <button class="linkish pick" data-pick-sdm="${v.id}">이 업체로 계약했어요</button>`}
+    </div>`;
+}
+
+// 비교표 — 별도 항목까지 나란히 놓는다. 그게 자료의 요지다.
+function sdmTable(list) {
+  const head = list
+    .map((v) => `<th class="col">${esc(v.name || '이름 없음')}
+        <span class="date">${v.consultDate ? esc(dateLabel(v.consultDate)) : '날짜 미입력'}</span></th>`)
+    .join('');
+
+  const row = (label, pick, unit = '원') =>
+    `<tr><th class="k">${label}</th>${list
+      .map((v) => {
+        const x = pick(v);
+        return x === null || x === '' || x === undefined
+          ? '<td class="empty">미입력</td>'
+          : `<td class="num">${won(x)}${unit}</td>`;
+      })
+      .join('')}</tr>`;
+
+  return `
+    <h2 class="section-title">비교</h2>
+    <div class="card compare-scroll">
+      <table class="compare">
+        <thead><tr><th class="k"></th>${head}</tr></thead>
+        <tbody>
+          ${row('패키지 금액', (v) => v.packagePrice)}
+          ${row('촬영 드레스', (v) => v.shootDress, '벌')}
+          ${row('본식 드레스', (v) => v.mainDress, '벌')}
+          ${SDM_EXTRAS.map(([k, label]) => row(label, (v) => v.extras?.[k])).join('')}
+          <tr class="total-row"><th class="k">별도 합계</th>${list
+            .map((v) => {
+              const t = sdmTotal(v);
+              return `<td class="num">${won(t.extraSum)}원</td>`;
+            })
+            .join('')}</tr>
+          <tr class="total-row"><th class="k">실제 예상</th>${list
+            .map((v) => {
+              const t = sdmTotal(v);
+              return t.ok
+                ? `<td class="num">${won(t.sum)}원</td>`
+                : '<td class="empty">계산 불가</td>';
+            })
+            .join('')}</tr>
+        </tbody>
+      </table>
+    </div>`;
+}
+
+// ── 스드메 업체 기록 ────────────────────────────────────────────────────
+function sdmEdit(id) {
+  const existing = id ? store.sdmVendor(id) : null;
+  if (id && !existing) return (location.hash = '#/sdm');
+  const v = existing ? { ...existing, extras: { ...existing.extras } } : blankSdm();
+  const isNew = !existing;
+  const picked = store.profile().pickedSdmId === v.id;
+
+  const money = (key, label, hint = '') => `
+    <div class="row${hint ? ' withhint' : ''}">
+      ${hint
+        ? `<span class="k"><b>${label}</b><em>${esc(hint)}</em></span>`
+        : `<label for="${key}">${label}</label>`}
+      <input id="${key}" type="number" inputmode="numeric" data-x="${key}"
+             value="${v[key] ?? ''}" placeholder="미입력" />
+    </div>`;
+
+  app.innerHTML = `
+    <button class="back" id="back">‹ 스드메</button>
+    <h1 class="hero sm">${isNew ? '업체 기록' : esc(v.name || '업체 기록')}</h1>
+    <p class="hero-sub">받은 견적을 그대로 적어보세요 · 자동 저장돼요</p>
+
+    <div class="card">
+      <div class="row">
+        <label for="name">업체 이름</label>
+        <input id="name" type="text" data-x="name" value="${esc(v.name)}"
+               placeholder="예: ○○웨딩" ${isNew ? 'autofocus' : ''} />
+      </div>
+      <div class="row">
+        <label for="consultDate">상담 날짜</label>
+        <input id="consultDate" type="date" data-x="consultDate" value="${esc(v.consultDate)}" />
+      </div>
+    </div>
+
+    <h2 class="section-title">패키지 <span class="hint">받은 견적 그대로</span></h2>
+    <div class="card">
+      ${money('packagePrice', '패키지 금액')}
+      <div class="row">
+        <label for="shootDress">촬영 드레스 (벌)</label>
+        <input id="shootDress" type="number" inputmode="numeric" data-x="shootDress"
+               value="${v.shootDress ?? ''}" placeholder="미입력" />
+      </div>
+      <div class="row">
+        <label for="mainDress">본식 드레스 (벌)</label>
+        <input id="mainDress" type="number" inputmode="numeric" data-x="mainDress"
+               value="${v.mainDress ?? ''}" placeholder="미입력" />
+      </div>
+      <div class="row">
+        <label for="album">앨범 · 액자</label>
+        <input id="album" type="text" data-x="album" value="${esc(v.album)}"
+               placeholder="예: 20p 1권 + 20R 액자" />
+      </div>
+    </div>
+
+    <h2 class="section-title">별도 비용
+      <span class="hint">계약 금액에 안 들어가요</span>
+    </h2>
+    <div class="card">
+      ${SDM_EXTRAS.map(([k, label, hint]) => `
+        <div class="row withhint">
+          <span class="k"><b>${label}</b><em>${esc(hint)}</em></span>
+          <input id="x-${k}" type="number" inputmode="numeric" data-extra="${k}"
+                 value="${v.extras?.[k] ?? ''}" placeholder="미입력" />
+        </div>`).join('')}
+      <div class="row total">
+        <span class="k"><b>실제 예상</b></span>
+        <span class="v" id="sdm-total"></span>
+      </div>
+    </div>
+    <p class="formula">패키지 금액 + 적어두신 별도 비용 · 모르는 항목은 비워두세요</p>
+
+    <h2 class="section-title">메모</h2>
+    <div class="card">
+      <div class="row" style="display:block">
+        <textarea data-x="memo" placeholder="담당자, 들은 조건, 마음에 걸린 것 …">${esc(v.memo)}</textarea>
+      </div>
+    </div>
+
+    <div class="sticky">
+      <button class="btn btn-primary" id="done">${
+        picked ? '저장' : '저장하고 비교표로'
+      }</button>
+      ${picked
+        ? '<button class="linkish ob-skip" data-unpick="sdm">계약 취소하고 다시 비교</button>'
+        : `<button class="linkish ob-skip" data-pick-sdm="${v.id}">이 업체로 계약했어요</button>`}
+    </div>
+
+    ${existing ? '<button class="danger" id="del">이 업체 기록 삭제</button>' : ''}
+  `;
+
+  const refresh = () => {
+    const t = sdmTotal(v);
+    const el = $('#sdm-total');
+    el.textContent = t.ok ? won(t.sum) + '원' : '패키지 금액을 넣어주세요';
+    el.style.color = t.ok ? 'var(--rose)' : 'var(--mute)';
+    el.style.fontSize = t.ok ? '16px' : '12px';
+  };
+  const persist = () => store.saveSdm(v);
+
+  app.querySelectorAll('[data-x]').forEach((el) => {
+    el.oninput = () => {
+      const k = el.dataset.x;
+      v[k] = el.type === 'number' ? (el.value === '' ? null : Number(el.value)) : el.value;
+      persist();
+      refresh();
+    };
+  });
+  app.querySelectorAll('[data-extra]').forEach((el) => {
+    el.oninput = () => {
+      v.extras[el.dataset.extra] = el.value === '' ? null : Number(el.value);
+      persist();
+      refresh();
+    };
+  });
+
+  $('#back').onclick = () => { persist(); location.hash = '#/sdm'; };
+  $('#done').onclick = () => { persist(); location.hash = '#/sdm'; };
+  if (existing) {
+    $('#del').onclick = () => {
+      if (confirm(`'${v.name || '이 업체'}' 기록을 지울까요?`)) {
+        store.removeSdm(v.id);
+        location.hash = '#/sdm';
+      }
+    };
+  }
+  bindPick('sdm');
+  refresh();
+}
+
+// 확정 · 확정 취소는 여러 화면에서 쓴다
+function bindPick(kind) {
+  app.querySelectorAll(`[data-pick-${kind}]`).forEach((b) => {
+    b.onclick = () => {
+      const id = b.dataset[kind === 'sdm' ? 'pickSdm' : 'pickVenue'];
+      store.pick(kind, id);
+      // 웨딩홀을 확정하면 예식일이 생긴다. 아직 안 적었으면 바로 물어본다.
+      if (kind === 'venue' && !store.profile().ceremonyDate) {
+        location.hash = '#/when';
+        return;
+      }
+      location.hash = kind === 'sdm' ? '#/sdm' : '#/venues';
+      render();
+    };
+  });
+  app.querySelectorAll('[data-unpick]').forEach((b) => {
+    b.onclick = () => {
+      if (!confirm('계약 확정을 취소하고 다시 비교할까요?\n적어둔 기록은 그대로 있어요.')) return;
+      store.unpick(b.dataset.unpick);
+      render();
+    };
+  });
+  app.querySelectorAll('[data-go-sdm]').forEach((b) => {
+    b.onclick = () => (location.hash = '#/sdm/v/' + b.dataset.goSdm);
+  });
 }
 
 // ── 허니문 ──────────────────────────────────────────────────────────────
@@ -832,42 +1142,72 @@ function guideView() {
 }
 
 // ── 웨딩홀 목록 + 비교 ──────────────────────────────────────────────────
+// 스드메와 같은 단계를 탄다. 알아보기 → 투어 비교 → 예약 확정.
 function venueListView() {
   const venues = store.venues();
   if (!venues.length) return venueEmptyView();
 
-  const hasSample = venues.some((v) => v.sample);
   const p = store.profile();
+  const picked = p.pickedVenueId ? store.venue(p.pickedVenueId) : null;
+  const hasSample = venues.some((v) => v.sample);
   const venueLate = prepStatus(p).filter((c) => c.state === 'late' && c.key === 'venueStatus');
+  const others = picked ? venues.filter((v) => v.id !== picked.id) : venues;
+
+  const card = (v) => {
+    const t = total(v);
+    const isPicked = p.pickedVenueId === v.id;
+    return `
+      <div class="cand">
+        <button class="venue" data-go="${v.id}">
+          <div class="name">${esc(v.name || '이름 없는 웨딩홀')}${
+            isPicked ? ' <span class="chip on">예약</span>' : ''
+          }${v.sample ? ' <span class="chip">예시</span>' : ''}</div>
+          <div class="meta">${
+            v.tourDate ? esc(dateLabel(v.tourDate)) + ' 투어' : '투어 날짜 미입력'
+          }</div>
+          <div class="sum${t === null ? ' none' : ''}">${
+            t === null ? '금액이 덜 채워졌어요' : won(t) + '원'
+          }</div>
+        </button>
+        ${isPicked ? '' : `
+          <button class="linkish pick" data-pick-venue="${v.id}">이 홀로 예약했어요</button>`}
+      </div>`;
+  };
 
   app.innerHTML = `
     ${brand('웨딩홀')}
-    <p class="sub">투어하면서 적은 것을 나란히 봅니다</p>
+    <p class="sub">${picked ? '예약한 홀과 비교했던 곳' : '투어하면서 적은 것을 나란히 봅니다'}</p>
     <div style="height:18px"></div>
     ${ddayCard(p, venueLate)}
-    ${statusCard('venueStatus')}
+
+    ${picked ? `
+      <div class="card notice ok">
+        <p><b>${esc(picked.name || '이름 없는 웨딩홀')}</b>로 예약하셨어요.</p>
+        <p>예상 합계 ${total(picked) === null ? '금액 미입력' : won(total(picked)) + '원'}</p>
+        <div class="btn-row">
+          <button class="btn btn-quiet" data-go="${picked.id}">계약 내용 보기</button>
+          <button class="btn btn-quiet" data-unpick="venue">다시 비교하기</button>
+        </div>
+      </div>
+      ${p.ceremonyDate ? '' : `
+        <div class="card notice gap">
+          <p><b>예식일을 넣어주세요.</b></p>
+          <p>계약서에 적힌 날짜를 넣으면 남은 준비 시점을 날짜로 챙겨드려요.</p>
+          <button class="btn btn-quiet" data-when-btn>예식일 넣기</button>
+        </div>`}
+    ` : statusCard('venueStatus')}
 
     ${hasSample ? `
-      <div class="card notice sample">
+      <div class="card notice sample gap">
         <p><b>예시 데이터로 둘러보는 중이에요.</b></p>
         <p>비교표가 어떻게 보이는지 보여드리려고 넣어둔 값입니다.</p>
         <button class="btn btn-quiet" id="clear-sample">지우고 내 기록 시작하기</button>
       </div>` : ''}
 
-    <div class="card">${venues
-      .map((v) => {
-        const t = total(v);
-        return `<button class="venue" data-go="${v.id}">
-          <div class="name">${esc(v.name || '이름 없는 웨딩홀')}${
-            v.sample ? ' <span class="chip">예시</span>' : ''
-          }</div>
-          <div class="meta">${v.tourDate ? esc(dateLabel(v.tourDate)) + ' 투어' : '투어 날짜 미입력'}</div>
-          <div class="sum${t === null ? ' none' : ''}">${
-            t === null ? '금액이 덜 채워졌어요' : won(t) + '원'
-          }</div>
-        </button>`;
-      })
-      .join('')}</div>
+    ${picked && others.length
+      ? `<h2 class="section-title">비교했던 곳 <span class="hint">${others.length}곳</span></h2>`
+      : `<h2 class="section-title">투어 기록 <span class="hint">${venues.length}곳</span></h2>`}
+    ${others.length ? `<div class="card">${others.map(card).join('')}</div>` : ''}
 
     <button class="btn btn-ghost" id="add" style="margin-top:14px">＋ 웨딩홀 기록하기</button>
 
@@ -887,12 +1227,15 @@ function venueListView() {
   app.querySelectorAll('[data-go]').forEach((b) => {
     b.onclick = () => (location.hash = '#/v/' + b.dataset.go);
   });
+  const whenBtn = app.querySelector('[data-when-btn]');
+  if (whenBtn) whenBtn.onclick = () => (location.hash = '#/when');
   if (hasSample) {
     $('#clear-sample').onclick = () => {
       if (confirm('예시 데이터를 지울까요?')) { store.clearSample(); render(); }
     };
   }
   bindStatus();
+  bindPick('venue');
   bindChrome();
 }
 
@@ -1013,7 +1356,12 @@ function editView(id) {
     </div>
 
     <div class="sticky">
-      <button class="btn btn-primary" id="done">비교표에 담기</button>
+      <button class="btn btn-primary" id="done">${
+        store.profile().pickedVenueId === v.id ? '저장' : '비교표에 담기'
+      }</button>
+      ${store.profile().pickedVenueId === v.id
+        ? '<button class="linkish ob-skip" data-unpick="venue">예약 확정 취소하고 다시 비교</button>'
+        : `<button class="linkish ob-skip" data-pick-venue="${v.id}">이 홀로 예약했어요</button>`}
     </div>
 
     ${existing ? '<button class="danger" id="del">이 웨딩홀 삭제</button>' : ''}
@@ -1073,7 +1421,7 @@ function editView(id) {
     }
   }
 
-  $('#back').onclick = () => (location.hash = '#/venues');
+  $('#back').onclick = () => { persist(); location.hash = '#/venues'; };
   $('#done').onclick = () => { persist(); location.hash = '#/venues'; };
   if (existing) {
     $('#del').onclick = () => {
@@ -1083,6 +1431,13 @@ function editView(id) {
       }
     };
   }
+
+  // 확정을 누르면 아직 저장 안 된 입력도 함께 담긴다
+  bindPick('venue');
+  app.querySelectorAll('[data-pick-venue]').forEach((b) => {
+    const go = b.onclick;
+    b.onclick = () => { persist(); go(); };
+  });
 
   refreshTotal();
   drawThumbs();
@@ -1139,6 +1494,8 @@ function render() {
       : monthView(editCtx());
   }
   if (h === '#/sdm') return sdmView();
+  if (h === '#/sdm/new') return sdmEdit(null);
+  if (h.startsWith('#/sdm/v/')) return sdmEdit(h.slice(8));
   if (h === '#/honeymoon') return honeymoonView();
   if (h === '#/honsu') return honsuView();
   if (h === '#/guide') return guideView();
