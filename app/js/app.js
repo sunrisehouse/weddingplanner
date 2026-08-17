@@ -38,7 +38,7 @@ const QUESTIONS = [
   {
     key: 'ceremonyDateStatus',
     title: '결혼식 날짜가\n정해지셨나요?',
-    sub: '자료에 적힌 예약 시점과 맞춰볼 기준이 돼요',
+    sub: '언제까지 무엇을 해야 하는지 알려드릴 기준이에요',
     options: [
       { v: 'confirmed', l: '네, 확정했어요', next: 'date' },
       { v: 'tentative', l: '가예약만 해뒀어요', next: 'date' },
@@ -158,12 +158,21 @@ function dateView(i) {
 }
 
 const STATE_TXT = {
-  done: ['했어요', 'ok'],
-  late: ['시점 지났어요', 'late'],
-  ok: ['아직 여유 있어요', 'ok'],
+  done: ['완료', 'ok'],
+  late: ['서둘러야 해요', 'late'],
+  ok: ['시간 있어요', 'ok'],
   nodate: ['예식일 정하면 알려드려요', 'mute'],
-  unanswered: ['안 답하셨어요', 'mute'],
+  unanswered: ['안 정하셨어요', 'mute'],
 };
+
+// 다음에 할 일은 앱이 정해서 준다. 목록을 던져놓고 알아서 보라고 하지 않는다.
+function nextStep(p) {
+  if (p.venueStatus === 'none' || p.venueStatus === null) {
+    return { hash: '#/guide', label: '웨딩홀 투어 준비하기' };
+  }
+  if (p.venueStatus === 'looking') return { hash: '#/new', label: '투어 기록 시작하기' };
+  return { hash: '#/new', label: '계약한 웨딩홀 기록하기' };
+}
 
 function doneView() {
   const p = store.profile();
@@ -180,42 +189,36 @@ function doneView() {
     .map((c) => {
       const [txt, cls] = STATE_TXT[c.state];
       return `<div class="row prep ${cls}">
-        <span class="k"><b>${c.label}</b><em>자료 기준 ${esc(c.note)}</em></span>
+        <span class="k"><b>${c.label}</b><em>${esc(c.note)}</em></span>
         <span class="st">${txt}</span>
       </div>`;
     })
     .join('');
 
-  // 자료에 적힌 시점이 지난 항목만 짚는다. 무엇을 먼저 하라고 정해주지는 않는다.
+  // 시점이 지난 것만 짚는다. 무엇을 먼저 하라고 순서를 정해주지는 않는다.
   const lead = late.length
     ? `<div class="card notice">
-         <p><b>${late.map((c) => esc(c.label)).join(' · ')}</b> — 자료 기준 예약 시점이 지났어요.</p>
-         <p>${late.map((c) => `${esc(c.label)} ${esc(c.note)}`).join(' / ')}.
-            지금 ${Math.floor(d / 30)}개월 남았습니다.</p>
+         <p><b>${late.map((c) => esc(c.label)).join(' · ')}</b> 예약을 서둘러주세요.</p>
+         <p>${late.map((c) => `${esc(c.label)} ${esc(c.by)}`).join(' · ')}까지 예약하셔야 하는데
+            지금 ${Math.floor(d / 30)}개월 남았어요.</p>
        </div>`
     : d === null
-      ? `<div class="card notice"><p><b>예식일을 정하면 시점을 맞춰볼 수 있어요.</b></p>
-         <p>자료의 예약 시점은 전부 예식일 기준이에요.</p></div>`
+      ? `<div class="card notice"><p><b>예식일을 정하시면 시점을 챙겨드릴게요.</b></p>
+         <p>예약 시점은 모두 예식일을 기준으로 세어드려요.</p></div>`
       : '';
 
   const caveats = prep.filter((c) => c.caveat && c.state !== 'done');
-  const cta = p.venueStatus === 'none' || p.venueStatus === null
-    ? { hash: '#/guide', label: '투어에서 물어볼 것 보기' }
-    : { hash: '#/new', label: '웨딩홀 기록 시작하기' };
+  const cta = nextStep(p);
 
   app.innerHTML = `
     ${brand()}
-    <h1 class="hero">준비됐어요</h1>
+    <h1 class="hero">이렇게 준비하시면 돼요</h1>
     <p class="hero-sub">답해주신 내용은 언제든 바꿀 수 있어요.</p>
     <div class="card">${dline}${rows}</div>
     ${lead}
     ${caveats.length
       ? `<p class="note">${caveats.map((c) => esc(c.caveat)).join('<br />')}</p>`
       : ''}
-    <p class="note">
-      시점은 전부 <b>박람회 자료에 인쇄된 값</b>이에요.
-      앱이 업체나 금액을 제안하지는 않아요.
-    </p>
     <div class="sticky">
       <button class="btn btn-primary" id="go">${cta.label}</button>
       <button class="linkish ob-skip" id="home">둘러보기</button>
@@ -251,7 +254,7 @@ function introView() {
         <span class="ico">🔍</span>
         <span class="txt">
           <b>아직 안 가봤어요</b>
-          <em>투어에서 뭘 물어볼지 볼게요</em>
+          <em>투어 준비부터 챙겨드릴게요</em>
         </span>
         <span class="arr">›</span>
       </button>
@@ -265,7 +268,7 @@ function introView() {
     <div class="card">
       <div class="row do"><span class="k">여러 홀을 나란히 비교</span><span class="mark yes">✓</span></div>
       <div class="row do"><span class="k">홀 사용료 + 꽃장식 + (보증인원 × 식대) 합산</span><span class="mark yes">✓</span></div>
-      <div class="row do"><span class="k">투어에서 물어볼 것 정리</span><span class="mark yes">✓</span></div>
+      <div class="row do"><span class="k">투어 전에 확인할 것 알려주기</span><span class="mark yes">✓</span></div>
       <div class="row do"><span class="k">시세 · 평균가 알려주기</span><span class="mark no">✕</span></div>
       <div class="row do"><span class="k">업체 추천 · 순위 매기기</span><span class="mark no">✕</span></div>
     </div>
@@ -285,14 +288,15 @@ function introView() {
   $('#demo').onclick = () => { store.loadSample(); location.hash = '#/'; render(); };
 }
 
-// ── 투어에서 물어볼 것 ───────────────────────────────────────────────────
+// ── 웨딩홀 투어 준비 ─────────────────────────────────────────────────────
+// 항목은 박람회 자료의 웨딩홀 구성에서 왔지만, 화면에서는 앱이 직접 챙겨준다.
 function guideView() {
   app.innerHTML = `
     <button class="back" id="back">‹ 처음으로</button>
-    <h1 class="hero sm">투어에서 물어볼 것</h1>
+    <h1 class="hero sm">웨딩홀 투어 준비</h1>
     <p class="hero-sub">
-      박람회 배포 자료의 웨딩홀 항목을 그대로 옮겼습니다.
-      이 항목들이 그대로 비교표가 됩니다.
+      투어 가시면 이것만 확인하시면 돼요.
+      확인한 그대로 비교표가 됩니다.
     </p>
 
     <h2 class="section-title">금액</h2>
@@ -313,8 +317,8 @@ function guideView() {
 
     <h2 class="section-title">놓치기 쉬운 것</h2>
     <div class="card">
-      <div class="row ask"><span class="k"><b>보증인원 최종 결정 시점</b><em>자료 기준 예식 2~3주 전에 확정합니다</em></span></div>
-      <div class="row ask"><span class="k"><b>예약 시점</b><em>자료 기준 최소 10개월 전 예약</em></span></div>
+      <div class="row ask"><span class="k"><b>보증인원 최종 결정 시점</b><em>예식 2~3주 전에 확정하시면 돼요</em></span></div>
+      <div class="row ask"><span class="k"><b>예약 시점</b><em>늦어도 10개월 전에 예약하세요</em></span></div>
       <div class="row ask"><span class="k"><b>위약금 기준</b><em>며칠 전부터 발생하는지</em></span></div>
     </div>
 
@@ -348,7 +352,7 @@ function listView() {
         p.ceremonyDateStatus === 'tentative' ? ' · 가예약' : ''
       }</span>
       ${late.length
-        ? `<span class="warn">자료 기준 시점 지남 · ${late.map((c) => esc(c.label)).join(' · ')}</span>`
+        ? `<span class="warn">${late.map((c) => esc(c.label)).join(' · ')} 예약을 서둘러주세요</span>`
         : ''}
     </div>`;
 
@@ -394,7 +398,7 @@ function listView() {
     <p class="note">
       앱은 순위를 매기거나 추천하지 않아요. 적어두신 것을 나란히 놓아드릴 뿐이에요.<br />
       기록은 <b>이 브라우저에만</b> 저장돼요. 다른 기기에서 보시려면 내보내기를 쓰세요.<br />
-      <button class="linkish" id="guide">투어에서 물어볼 것 다시 보기</button> ·
+      <button class="linkish" id="guide">투어 준비 다시 보기</button> ·
       <button class="linkish" id="redo">처음 답한 내용 수정</button>
     </p>
   `;
