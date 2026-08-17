@@ -184,22 +184,22 @@ export function daysToCeremony(profile) {
 export const PREP = [
   {
     key: 'venueStatus', label: '웨딩홀', days: 300,
-    note: '늦어도 10개월 전에 예약하세요', by: '10개월 전',
+    note: '늦어도 10개월 전에 예약하세요', by: '10개월 전', todo: '예약하세요',
     items: '예식장 사용료 · 꽃장식 · 피로연 · 본식 스냅',
   },
   {
     key: 'sdmStatus', label: '스드메', days: 300,
-    note: '10~12개월 전에 예약하세요', by: '10개월 전',
+    note: '10~12개월 전에 예약하세요', by: '10개월 전', todo: '예약하세요',
     items: '스튜디오 · 드레스 · 헤어메이크업 · 부케',
   },
   {
     key: 'honeymoonStatus', label: '허니문', days: 180,
-    note: '6~8개월 전에 예약하세요', by: '6개월 전',
+    note: '6~8개월 전에 예약하세요', by: '6개월 전', todo: '예약하세요',
     items: '신혼여행비 · 예비비',
   },
   {
     key: 'honsuStatus', label: '혼수', days: 90,
-    note: '예단은 3개월 전에 준비하세요', by: '3개월 전',
+    note: '예단은 3개월 전에 준비하세요', by: '3개월 전', todo: '예단 준비하세요',
     items: '한복 · 웨딩반지 · 예복 · 예단 · 가전/가구',
     caveat: '한복은 촬영 2개월 전, 가전·가구는 입주 2~3개월 전에 맞추세요. '
       + '예식일과 기준이 달라 위 계산에는 넣지 않았어요.',
@@ -210,6 +210,8 @@ export const PREP = [
 // 앱이 순서를 정해주는 게 아니라, 자료에 적힌 시점이 지났는지만 알린다.
 export function prepStatus(profile) {
   const d = daysToCeremony(profile);
+  const base = profile?.ceremonyDate ? new Date(profile.ceremonyDate + 'T00:00:00') : null;
+  const ok = base && !Number.isNaN(base.getTime());
   return PREP.map((c) => {
     const answer = profile?.[c.key] ?? null;
     let state;
@@ -218,6 +220,12 @@ export function prepStatus(profile) {
     else if (d === null) state = 'nodate';            // 예식일을 모르면 시점을 못 따진다
     else if (d < c.days) state = 'late';
     else state = 'ok';
-    return { ...c, answer, state, d };
+    // 마감일 = 예식일에서 시점만큼 앞당긴 날
+    const due = ok ? new Date(base.getTime() - c.days * 86400000) : null;
+    return {
+      ...c, answer, state, d,
+      dueDate: due ? due.toISOString().slice(0, 10) : null,
+      daysLeft: d === null ? null : d - c.days,
+    };
   });
 }

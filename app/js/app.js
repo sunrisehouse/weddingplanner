@@ -16,6 +16,22 @@ const dateLabel = (iso) => {
   return `${d.getMonth() + 1}월 ${d.getDate()}일 (${'일월화수목금토'[d.getDay()]})`;
 };
 
+// 마감일은 요일까지 필요 없다. 해가 넘어가면 연도를 붙인다.
+const mdLabel = (iso) => {
+  if (!iso) return '';
+  const d = new Date(iso + 'T00:00:00');
+  if (Number.isNaN(d.getTime())) return '';
+  const md = `${d.getMonth() + 1}월 ${d.getDate()}일`;
+  return d.getFullYear() === new Date().getFullYear() ? md : `${d.getFullYear()}년 ${md}`;
+};
+
+// 서술격 조사 — 받침이 있으면 '이에요', 없으면 '예요'
+const ida = (word) => {
+  const c = String(word).charCodeAt(String(word).length - 1);
+  const hangul = c >= 0xac00 && c <= 0xd7a3;
+  return hangul && (c - 0xac00) % 28 !== 0 ? '이에요' : '예요';
+};
+
 const INCLUDES = [
   ['bridalRoom', '신부대기실'],
   ['pyebaekRoom', '폐백실'],
@@ -244,31 +260,58 @@ function ddayCard(p, late) {
     </div>`;
 }
 
-// ── 홈 — 준비 현황 ──────────────────────────────────────────────────────
-// 첫 화면은 특정 기능이 아니라 준비 전체다.
-// 웨딩홀 투어 기록은 여기서 버튼을 눌러 들어간다.
+// ── 탭 ──────────────────────────────────────────────────────────────────
+// 최상위 화면은 홈과 웨딩홀 둘이다. 그 아래 화면(기록 폼 · 투어 준비 ·
+// 온보딩)은 뒤로 가기로 돌아가므로 탭을 붙이지 않는다.
+const TABS = [
+  ['home', '#/', '🏠', '홈'],
+  ['venue', '#/venues', '💐', '웨딩홀'],
+];
+
+function tabBar(active) {
+  return `<nav class="tabs">${TABS.map(
+    ([key, hash, icon, label]) => `
+      <button data-tab="${hash}" ${active === key ? 'aria-current="page"' : ''}>
+        <span class="i">${icon}</span>${label}
+      </button>`
+  ).join('')}</nav>`;
+}
+
+function bindTabs() {
+  app.querySelectorAll('[data-tab]').forEach((b) => {
+    b.onclick = () => (location.hash = b.dataset.tab);
+  });
+}
+
+// ── 홈 — 준비 전체 ──────────────────────────────────────────────────────
+// 첫 화면에는 전체로 봐야 하는 것만 둔다.
+// 웨딩홀처럼 특정 항목을 다루는 화면은 탭에서 들어간다.
 function homeView() {
   const p = store.profile();
   const prep = prepStatus(p);
   const late = prep.filter((c) => c.state === 'late');
-  const venues = store.venues();
-  const real = venues.filter((v) => !v.sample).length;
+
+  // 다음에 다가오는 마감 — 이미 지난 것과 끝낸 것은 뺀다
+  const next = prep
+    .filter((c) => c.state === 'ok' && c.daysLeft !== null)
+    .sort((a, b) => a.daysLeft - b.daysLeft)[0];
 
   const rows = prep
     .map((c) => {
       const [txt, cls] = STATE_TXT[c.state];
+      // 끝낸 항목은 시점을 다시 말하지 않는다.
+      // 예식일을 알면 '언제까지'를 날짜로 준다.
+      const when = c.state === 'done'
+        ? ''
+        : c.dueDate
+          ? `${mdLabel(c.dueDate)}까지 ${c.todo}`
+          : c.note;
       return `<div class="row prep ${cls}">
-        <span class="k"><b>${c.label}</b><em>${esc(c.note)}</em></span>
+        <span class="k"><b>${c.label}</b>${when ? `<em>${esc(when)}</em>` : ''}</span>
         <span class="st">${txt}</span>
       </div>`;
     })
     .join('');
-
-  const venueSub = venues.length === 0
-    ? '아직 적어둔 곳이 없어요'
-    : real === 0
-      ? '예시로 둘러보는 중이에요'
-      : `${real}곳 적어두셨어요`;
 
   app.innerHTML = `
     ${brand('결혼 준비')}
@@ -280,30 +323,19 @@ function homeView() {
            <p>예약 시점은 모두 예식일을 기준으로 세어드려요.</p>
          </div>` : ''}
 
+    ${next ? `
+      <div class="card notice ok">
+        <p><b>다음은 ${esc(next.label)}${ida(next.label)}.</b></p>
+        <p>${mdLabel(next.dueDate)}까지 ${esc(next.todo)} · ${next.daysLeft}일 남았어요.</p>
+      </div>` : ''}
+
     <h2 class="section-title">준비 현황
       <button class="linkish" id="redo">답 수정</button>
     </h2>
     <div class="card">${rows}</div>
-
-    <h2 class="section-title">웨딩홀</h2>
-    <div class="card choice">
-      <button class="choice-row" id="go-venues">
-        <span class="ico">📝</span>
-        <span class="txt">
-          <b>투어 기록</b>
-          <em>${esc(venueSub)}</em>
-        </span>
-        <span class="arr">›</span>
-      </button>
-      <button class="choice-row" id="go-guide">
-        <span class="ico">🔍</span>
-        <span class="txt">
-          <b>투어 준비</b>
-          <em>투어에서 확인할 것</em>
-        </span>
-        <span class="arr">›</span>
-      </button>
-    </div>
+    ${late.length || next
+      ? '<p class="note">마감일은 예식일에서 거꾸로 세어드린 날짜예요.</p>'
+      : ''}
 
     <div class="btn-row">
       <button class="btn btn-quiet" id="export">내보내기</button>
@@ -315,21 +347,22 @@ function homeView() {
       기록은 <b>이 브라우저에만</b> 저장돼요. 다른 기기나 상대방 폰에서는 보이지 않아요.
       옮기실 때는 내보내기를 쓰세요.
     </p>
+    ${tabBar('home')}
   `;
   $('#redo').onclick = () => (location.hash = '#/start/1');
-  $('#go-venues').onclick = () => (location.hash = '#/venues');
-  $('#go-guide').onclick = () => (location.hash = '#/guide');
   $('#export').onclick = doExport;
   $('#import').onclick = () => $('#file').click();
   $('#file').onchange = doImport;
+  bindTabs();
 }
 
 // ── 웨딩홀 기록이 0곳일 때 ───────────────────────────────────────────────
 // 빈 비교표를 보여주는 대신 갈래를 나눈다.
 function venueEmptyView() {
   app.innerHTML = `
-    <button class="back" id="back">‹ 홈</button>
-    <h1 class="hero sm">웨딩홀 투어,<br />적어두고 나란히 비교하세요</h1>
+    ${brand('웨딩홀')}
+    <p class="sub">투어를 적어두면 나란히 비교해드려요</p>
+    <h1 class="hero sm" style="margin-top:22px">투어 다녀오셨나요?</h1>
     <p class="hero-sub">
       받은 견적을 그대로 적으면 <b>실제로 얼마인지</b> 계산해드려요.
       홀 사용료만 보면 식대가 빠져 실제 금액을 알 수 없습니다.
@@ -357,18 +390,19 @@ function venueEmptyView() {
     <button class="btn btn-quiet" id="demo" style="margin-top:12px">
       예시로 먼저 둘러보기
     </button>
+    ${tabBar('venue')}
   `;
-  $('#back').onclick = () => (location.hash = '#/');
   $('#go-record').onclick = () => (location.hash = '#/new');
   $('#go-guide').onclick = () => (location.hash = '#/guide');
   $('#demo').onclick = () => { store.loadSample(); location.hash = '#/venues'; render(); };
+  bindTabs();
 }
 
 // ── 웨딩홀 투어 준비 ─────────────────────────────────────────────────────
 // 항목은 박람회 자료의 웨딩홀 구성에서 왔지만, 화면에서는 앱이 직접 챙겨준다.
 function guideView() {
   app.innerHTML = `
-    <button class="back" id="back">‹ 홈</button>
+    <button class="back" id="back">‹ 웨딩홀</button>
     <h1 class="hero sm">웨딩홀 투어 준비</h1>
     <p class="hero-sub">
       투어 가시면 이것만 확인하시면 돼요.
@@ -407,7 +441,7 @@ function guideView() {
       <button class="btn btn-primary" id="record">투어 기록하기</button>
     </div>
   `;
-  $('#back').onclick = () => (location.hash = '#/');
+  $('#back').onclick = () => (location.hash = '#/venues');
   $('#record').onclick = () => (location.hash = '#/new');
 }
 
@@ -421,9 +455,9 @@ function venueListView() {
   const venueLate = prepStatus(p).filter((c) => c.state === 'late' && c.key === 'venueStatus');
 
   app.innerHTML = `
-    <button class="back" id="back">‹ 홈</button>
-    <h1 class="hero sm">웨딩홀 투어 기록</h1>
-    <p class="hero-sub">투어하면서 적은 것을 나란히 봅니다.</p>
+    ${brand('웨딩홀')}
+    <p class="sub">투어하면서 적은 것을 나란히 봅니다</p>
+    <div style="height:18px"></div>
     ${ddayCard(p, venueLate)}
 
     ${hasSample ? `
@@ -458,9 +492,9 @@ function venueListView() {
       적어두신 것을 나란히 놓아드릴 뿐이에요. 순위를 매기거나 추천하지 않아요.<br />
       <button class="linkish" id="guide">투어 준비 다시 보기</button>
     </p>
+    ${tabBar('venue')}
   `;
 
-  $('#back').onclick = () => (location.hash = '#/');
   $('#add').onclick = () => (location.hash = '#/new');
   $('#guide').onclick = () => (location.hash = '#/guide');
   app.querySelectorAll('[data-go]').forEach((b) => {
@@ -471,6 +505,7 @@ function venueListView() {
       if (confirm('예시 데이터를 지울까요?')) { store.clearSample(); render(); }
     };
   }
+  bindTabs();
 }
 
 function compareTable(venues) {
