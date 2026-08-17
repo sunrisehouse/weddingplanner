@@ -1414,11 +1414,11 @@ function honsuView() {
 function venueEmptyView() {
   app.innerHTML = `
     ${brand('웨딩홀')}
-    <p class="sub">알아본 곳을 나란히 비교해드려요</p>
+    <p class="sub">정할 것 — 어느 예식장</p>
     <h1 class="hero sm" style="margin-top:22px">웨딩홀 정보를<br />적어주세요</h1>
     <p class="hero-sub">
-      받은 견적을 그대로 적으면 <b>실제로 얼마인지</b> 계산해드려요.
-      홀 사용료만 보면 식대가 빠져 실제 금액을 알 수 없습니다.
+      <b>어느 예식장으로 할지</b>가 가장 큰 결정이에요.
+      받은 견적을 그대로 적으면 실제로 얼마인지 계산해서 나란히 비교해드려요.
     </p>
 
     <div class="card choice">
@@ -1494,8 +1494,9 @@ function guideView() {
   $('#record').onclick = () => (location.hash = '#/new');
 }
 
-// ── 웨딩홀 목록 + 비교 ──────────────────────────────────────────────────
-// 스드메와 같은 단계를 탄다. 알아보기 → 비교 → 예약 확정.
+// ── 웨딩홀 — 정할 것은 하나, 어느 예식장이냐 ────────────────────────────
+// 예식장 선택이 가장 큰 결정이다. 꽃장식 · 식대 · 시설은 홀을 정한 뒤에
+// 고르는 옵션이라, 정하기 전에는 화면에 비교 중인 곳만 둔다.
 function venueListView() {
   const venues = store.venues();
   if (!venues.length) return venueEmptyView();
@@ -1506,40 +1507,47 @@ function venueListView() {
   const venueLate = prepStatus(p).filter((c) => c.state === 'late' && c.key === 'venueStatus');
   const others = picked ? venues.filter((v) => v.id !== picked.id) : venues;
 
+  // 비교 중인 곳은 예상 합계가 싼 순으로 세운다. 금액이 덜 찬 곳은 뒤로.
+  const ranked = [...others].sort((a, b) => {
+    const ta = total(a);
+    const tb = total(b);
+    if (ta === null) return tb === null ? 0 : 1;
+    if (tb === null) return -1;
+    return ta - tb;
+  });
+  const best = ranked.find((v) => total(v) !== null) ?? null;
+
   const card = (v) => {
     const t = total(v);
-    const isPicked = p.pickedVenueId === v.id;
+    const cheapest = !picked && best && v.id === best.id && ranked.length >= 2;
     return `
       <div class="cand">
         <button class="venue" data-go="${v.id}">
           <div class="name">${esc(v.name || '이름 없는 웨딩홀')}${
-            isPicked ? ' <span class="chip on">예약</span>' : ''
+            cheapest ? ' <span class="chip on">가장 저렴</span>' : ''
           }${v.sample ? ' <span class="chip">예시</span>' : ''}</div>
-          <div class="meta">${
-            v.tourDate ? esc(dateLabel(v.tourDate)) : '날짜 미입력'
-          }</div>
           <div class="sum${t === null ? ' none' : ''}">${
             t === null ? '금액이 덜 채워졌어요' : won(t) + '원'
           }</div>
+          <div class="meta">${esc(mealLine(v))}</div>
         </button>
-        ${isPicked ? '' : `
-          <button class="linkish pick" data-pick-venue="${v.id}">이 홀로 예약했어요</button>`}
+        <button class="linkish pick" data-pick-venue="${v.id}">이 홀로 예약했어요</button>
       </div>`;
   };
 
   app.innerHTML = `
     ${brand('웨딩홀')}
-    <p class="sub">${picked ? '예약한 홀과 비교했던 곳' : '알아본 곳을 나란히 봅니다'}</p>
+    <p class="sub">${picked ? '정한 예식장과 옵션' : '정할 것 — 어느 예식장'}</p>
     <div style="height:18px"></div>
     ${ddayCard(p, venueLate)}
 
     ${picked ? `
       <div class="card notice ok">
-        <p><b>${esc(picked.name || '이름 없는 웨딩홀')}</b>로 예약하셨어요.</p>
+        <p><b>${esc(picked.name || '이름 없는 웨딩홀')}</b>로 정하셨어요.</p>
         <p>예상 합계 ${total(picked) === null ? '금액 미입력' : won(total(picked)) + '원'}</p>
         <div class="btn-row">
           <button class="btn btn-quiet" data-go="${picked.id}">계약 내용 보기</button>
-          <button class="btn btn-quiet" data-unpick="venue">다시 비교하기</button>
+          <button class="btn btn-quiet" data-unpick="venue">다시 정하기</button>
         </div>
       </div>
       ${p.ceremonyDate ? '' : `
@@ -1548,7 +1556,19 @@ function venueListView() {
           <p>계약서에 적힌 날짜를 넣으면 남은 준비 시점을 날짜로 챙겨드려요.</p>
           <button class="btn btn-quiet" data-when-btn>예식일 넣기</button>
         </div>`}
-    ` : statusCard('venueStatus')}
+      ${optionCard(picked)}
+    ` : `
+      <h2 class="section-title">비교 중인 곳 <span class="hint">${ranked.length}곳</span></h2>
+      <div class="card">${ranked.map(card).join('')}</div>
+      <button class="btn btn-ghost" id="add" style="margin-top:14px">＋ 웨딩홀 기록하기</button>
+      ${ranked.length >= 2 ? `
+        <details class="more">
+          <summary>항목별로 비교하기</summary>
+          ${compareTable(ranked, '')}
+        </details>`
+        : '<p class="note">한 곳 더 적으면 <b>나란히 비교</b>해드려요.</p>'}
+      <p class="note">꽃장식 · 식대 · 시설 같은 옵션은 홀을 정한 뒤에 고르시면 돼요.</p>
+    `}
 
     ${hasSample ? `
       <div class="card notice sample gap">
@@ -1557,16 +1577,16 @@ function venueListView() {
         <button class="btn btn-quiet" id="clear-sample">지우고 내 기록 시작하기</button>
       </div>` : ''}
 
-    ${picked && others.length
-      ? `<h2 class="section-title">비교했던 곳 <span class="hint">${others.length}곳</span></h2>`
-      : `<h2 class="section-title">웨딩홀 기록 <span class="hint">${venues.length}곳</span></h2>`}
-    ${others.length ? `<div class="card">${others.map(card).join('')}</div>` : ''}
-
-    <button class="btn btn-ghost" id="add" style="margin-top:14px">＋ 웨딩홀 기록하기</button>
-
-    ${venues.length >= 2
-      ? compareTable(venues)
-      : `<p class="note">한 곳 더 기록하면 <b>비교표</b>가 나타납니다.</p>`}
+    ${picked && others.length ? `
+      <details class="more">
+        <summary>비교했던 곳 ${others.length}곳</summary>
+        <div class="card">${others.map(card).join('')}</div>
+        ${venues.length >= 2 ? compareTable(venues) : ''}
+      </details>` : ''}
+    ${picked
+      ? '<button class="btn btn-ghost" id="add" style="margin-top:14px">＋ 웨딩홀 기록하기</button>'
+      : ''}
+    ${statusCard('venueStatus')}
 
     <p class="note"><button class="linkish" id="guide">웨딩홀에서 확인할 것 보기</button></p>
     ${tabBar('venue')}
@@ -1589,7 +1609,52 @@ function venueListView() {
   bindChrome();
 }
 
-function compareTable(venues) {
+// 카드 한 줄 요약 — 합계가 왜 그 금액인지 알려주는 두 값만.
+function mealLine(v) {
+  const meal = v.mealPrice === null || v.mealPrice === ''
+    ? '식대 미입력' : `식대 ${won(v.mealPrice)}원`;
+  const g = v.guarantee === null || v.guarantee === ''
+    ? '보증인원 미입력' : `보증 ${won(v.guarantee)}명`;
+  return `${meal} · ${g}`;
+}
+
+// 홀을 정한 뒤 남는 것은 옵션 선택뿐이다. 기록한 값을 그대로 보여준다.
+function optionCard(v) {
+  const money = (label, key, hint) => {
+    const blank = v[key] === null || v[key] === '';
+    return `
+      <div class="row${hint ? ' withhint' : ''}">
+        <span class="k"><b>${label}</b>${hint ? `<em>${hint}</em>` : ''}</span>
+        <span class="st${blank ? ' mute' : ''}">${
+          blank ? '미정' : won(v[key]) + '원'
+        }</span>
+      </div>`;
+  };
+  const tri = ([key, label]) => {
+    const val = v[key] === 'yes' ? '포함' : v[key] === 'no' ? '없음' : '미확인';
+    return `
+      <div class="row">
+        <span class="k">${label}</span>
+        <span class="st${v[key] === 'unknown' ? ' mute' : ''}">${val}</span>
+      </div>`;
+  };
+
+  return `
+    <h2 class="section-title">옵션</h2>
+    <div class="card">
+      ${money('꽃장식', 'flowers', '단상 · 꽃길 · 테이블세팅 범위')}
+      ${money('식대 (1인)', 'mealPrice', `보증인원 ${
+        v.guarantee === null || v.guarantee === '' ? '미정' : won(v.guarantee) + '명'
+      }`)}
+      ${INCLUDES.map(tri).join('')}
+    </div>
+    <p class="note">
+      옵션은 홀과 상의해 정하시면 돼요. 정해지면
+      <button class="linkish" data-go="${v.id}">기록을 고쳐주세요</button>
+    </p>`;
+}
+
+function compareTable(venues, title = '비교') {
   const head = venues
     .map((v) => `<th class="col">${esc(v.name || '이름 없음')}
         <span class="date">${v.tourDate ? esc(dateLabel(v.tourDate)) : '날짜 미입력'}</span></th>`)
@@ -1614,7 +1679,7 @@ function compareTable(venues) {
       .join('')}</tr>`;
 
   return `
-    <h2 class="section-title">비교</h2>
+    ${title ? `<h2 class="section-title">${title}</h2>` : ''}
     <div class="card"><div class="compare-scroll">
       <table class="compare">
         <thead><tr><th class="k"></th>${head}</tr></thead>
