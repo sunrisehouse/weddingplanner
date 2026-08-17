@@ -1,0 +1,160 @@
+:root {
+  --bg: #f4f1ee;
+  --card: #ffffff;
+  --ink: #2b2724;
+  --mute: #94897f;
+  --rose: #c4756b;
+  --rose-bg: #faeeec;
+  --line: #eae4df;
+  --line-soft: #f2ede9;
+  --green: #6e8b6f;
+  --field: #fbfaf9;
+  --radius: 16px;
+  --pad: 20px;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', 'Nanum Gothic', sans-serif;
+  -webkit-text-size-adjust: 100%;
+}
+
+body { padding-bottom: env(safe-area-inset-bottom); }
+
+.wrap {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 0 var(--pad) 96px;
+}
+
+/* ── 헤더 ─────────────────────────────────────────── */
+header { padding: 28px 0 4px; }
+h1 { font-size: 22px; margin: 0; letter-spacing: -0.01em; }
+.sub { color: var(--mute); font-size: 12.5px; margin: 6px 0 0; }
+
+.back {
+  display: inline-flex; align-items: center; gap: 6px;
+  color: var(--mute); font-size: 12.5px;
+  background: none; border: 0; padding: 0 0 10px; cursor: pointer;
+}
+
+/* ── 카드 ─────────────────────────────────────────── */
+.card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.section-title {
+  font-size: 13.5px; font-weight: 700;
+  margin: 26px 0 10px; display: flex; justify-content: space-between; align-items: baseline;
+}
+.section-title .hint { font-weight: 400; font-size: 11px; color: var(--mute); }
+
+/* ── 리스트 행 ────────────────────────────────────── */
+.row {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 13px 18px; min-height: 48px;
+  border-top: 1px solid var(--line-soft);
+}
+.row:first-child { border-top: 0; }
+.row label, .row .k { font-size: 13px; color: var(--ink); }
+.row .v { font-size: 13px; font-weight: 600; text-align: right; }
+.row input[type='text'],
+.row input[type='number'],
+.row input[type='date'] {
+  border: 0; background: transparent; text-align: right;
+  font: inherit; font-size: 13.5px; font-weight: 600; color: var(--ink);
+  width: 58%; padding: 4px 0; min-width: 0;
+}
+.row input:focus { outline: none; }
+.row:focus-within { background: #fdf7f6; }
+.row input::placeholder { color: var(--mute); font-weight: 400; opacity: 0.8; }
+
+textarea {
+  width: 100%; border: 0; background: transparent; resize: vertical;
+  font: inherit; font-size: 13.5px; color: var(--ink); padding: 0; min-height: 64px;
+}
+textarea:focus { outline: none; }
+
+/* ── 합계 ─────────────────────────────────────────── */
+.total { border-top: 1px solid var(--line); }
+.total .v { color: var(--rose); font-size: 16px; font-weight: 700; }
+.formula { color: var(--mute); font-size: 10.5px; margin: 8px 2px 0; line-height: 1.5; }
+
+/* ── 3단 선택 ─────────────────────────────────────── */
+.seg { display: inline-flex; background: var(--bg); border-radius: 14px; padding: 2px; }
+.seg button {
+  border: 0; background: none; font: inherit; font-size: 11.5px; color: var(--mute);
+  padding: 5px 12px; border-radius: 12px; cursor: pointer; white-space: nowrap;
+}
+.seg button[aria-pressed='true'] {
+  background: var(--card); color: var(--ink); font-weight: 600;
+  box-shadow: 0 0 0 0.8px var(--line);
+}
+
+/* ── 버튼 ─────────────────────────────────────────── */
+.btn {
+  display: block; width: 100%; text-align: center;
+  border: 0; border-radius: 16px; padding: 14px;
+  font: inherit; font-size: 14px; font-weight: 600; cursor: pointer;
+}
+.btn-primary { background: var(--rose); color: #fff; }
+.btn-ghost {
+  background: var(--field); color: var(--mute);
+  border: 1.2px dashed #d8d0c9;
+}
+.btn-quiet { background: var(--rose-bg); color: var(--rose); }
+.btn-row { display: flex; gap: 10px; margin-top: 14px; }
+.btn-row .btn { flex: 1; font-size: 12.5px; padding: 11px; }
+
+.sticky {
+  position: sticky; bottom: 0; margin: 0 calc(var(--pad) * -1);
+  padding: 12px var(--pad) calc(12px + env(safe-area-inset-bottom));
+  background: linear-gradient(to top, var(--bg) 72%, transparent);
+}
+
+/* ── 웨딩홀 카드 ──────────────────────────────────── */
+.venue { display: block; width: 100%; text-align: left; border: 0; background: none;
+         font: inherit; color: inherit; cursor: pointer; padding: 16px 18px; }
+.venue + .venue { border-top: 1px solid var(--line-soft); }
+.venue .name { font-size: 14.5px; font-weight: 700; }
+.venue .meta { font-size: 11.5px; color: var(--mute); margin-top: 4px; }
+.venue .sum { font-size: 14px; font-weight: 700; color: var(--rose); margin-top: 8px; }
+.venue .sum.none { color: var(--mute); font-weight: 400; font-size: 12px; }
+
+/* ── 비교표 ───────────────────────────────────────── */
+.compare-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+table.compare { border-collapse: collapse; width: 100%; font-size: 12.5px; }
+table.compare th, table.compare td {
+  padding: 11px 10px; text-align: center; white-space: nowrap;
+  border-top: 1px solid var(--line-soft);
+}
+table.compare thead th { border-top: 0; }
+table.compare th.k, table.compare td.k {
+  text-align: left; color: var(--ink); font-weight: 400;
+  position: sticky; left: 0; background: var(--card); min-width: 84px;
+}
+table.compare thead th.col { background: #f1ede9; border-radius: 10px 10px 0 0; min-width: 96px; }
+table.compare thead .date { display: block; font-weight: 400; font-size: 10px; color: var(--mute); margin-top: 3px; }
+td.num { font-weight: 600; }
+td.empty { color: var(--mute); opacity: 0.7; font-size: 11px; }
+tr.total-row td, tr.total-row th { border-top: 1px solid var(--line); font-weight: 700; }
+tr.total-row td.num { color: var(--rose); }
+.yes { color: var(--green); font-weight: 600; }
+.no { color: var(--rose); font-weight: 600; }
+
+/* ── 기타 ─────────────────────────────────────────── */
+.empty-state { color: var(--mute); font-size: 12.5px; text-align: center; padding: 34px 16px; line-height: 1.7; }
+.note { color: var(--mute); font-size: 11px; line-height: 1.7; margin: 14px 2px 0; }
+.chip { display: inline-block; background: #f1ede9; color: var(--mute);
+        border-radius: 9px; padding: 3px 9px; font-size: 10.5px; font-weight: 600; }
+.thumbs { display: flex; gap: 8px; flex-wrap: wrap; padding: 0 18px 14px; }
+.thumbs img { width: 62px; height: 62px; object-fit: cover; border-radius: 10px; border: 1px solid var(--line); }
+.danger { color: var(--rose); background: none; border: 0; font: inherit; font-size: 12px;
+          cursor: pointer; padding: 16px 2px; display: block; width: 100%; text-align: center; }

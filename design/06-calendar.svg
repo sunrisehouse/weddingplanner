@@ -1,0 +1,92 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 376 756" width="376" height="756">
+<style>
+  .f { font-family: 'Apple SD Gothic Neo','Noto Sans KR','Malgun Gothic','Nanum Gothic','WenQuanYi Zen Hei',sans-serif; }
+  .ink { fill: #2B2724; }
+  .mute { fill: #94897F; }
+  .rose { fill: #C4756B; }
+  .white { fill: #FFFFFF; }
+  .b { font-weight: 700; }
+  .sb { font-weight: 600; }
+</style>
+<rect width="376" height="756" fill="#F4F1EE"/>
+<g transform="translate(18,18)">
+  <rect width="340" height="720" rx="30" fill="#FFFFFF" stroke="#E5DED8"/>
+  <text class="f mute" x="24" y="36" font-size="10.5">9:41</text>
+
+  <text class="f b ink" x="24" y="76" font-size="20">일정</text>
+  <rect x="212" y="58" width="108" height="28" rx="14" fill="#F4F1EE"/>
+  <rect x="214" y="60" width="52" height="24" rx="12" fill="#FFFFFF"/>
+  <text class="f sb mute" x="240" y="76" font-size="10.5" text-anchor="middle">목록</text>
+  <rect x="266" y="60" width="52" height="24" rx="12" fill="#2B2724"/>
+  <text class="f sb white" x="292" y="76" font-size="10.5" text-anchor="middle">월</text>
+
+  <text class="f b ink" x="24" y="122" font-size="15">2026년 8월</text>
+  <path d="M272 116 l-6 6 l6 6" stroke="#94897F" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M300 116 l6 6 l-6 6" stroke="#2B2724" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <text class="f sb" x="43" y="150" font-size="10" text-anchor="middle" fill="#C4756B" opacity="0.8">일</text>
+  <text class="f sb" x="85" y="150" font-size="10" text-anchor="middle" fill="#94897F" opacity="0.8">월</text>
+  <text class="f sb" x="127" y="150" font-size="10" text-anchor="middle" fill="#94897F" opacity="0.8">화</text>
+  <text class="f sb" x="169" y="150" font-size="10" text-anchor="middle" fill="#94897F" opacity="0.8">수</text>
+  <text class="f sb" x="211" y="150" font-size="10" text-anchor="middle" fill="#94897F" opacity="0.8">목</text>
+  <text class="f sb" x="253" y="150" font-size="10" text-anchor="middle" fill="#94897F" opacity="0.8">금</text>
+  <text class="f sb" x="295" y="150" font-size="10" text-anchor="middle" fill="#8A93A0" opacity="0.8">토</text>
+  <line x1="22" y1="158" x2="316" y2="158" stroke="#F2EDE9"/>
+
+  <text class="f" x="295" y="185" font-size="12.5" text-anchor="middle" fill="#8A93A0" opacity="0.55">1</text>
+  <text class="f" x="43" y="231" font-size="12.5" text-anchor="middle" fill="#C4756B" opacity="0.55">2</text>
+  <text class="f" x="85" y="231" font-size="12.5" text-anchor="middle" fill="#2B2724" opacity="0.75">3</text>
+  <text class="f" x="127" y="231" font-size="12.5" text-anchor="middle" fill="#2B2724" opacity="0.75">4</text>
+  <text class="f" x="169" y="231" font-size="12.5" text-anchor="middle" fill="#2B2724" opacity="0.75">5</text>
+  <text class="f" x="211" y="231" font-size="12.5" text-anchor="middle" fill="#2B2724" opacity="0.75">6</text>
+  <text class="f" x="253" y="231" font-size="12.5" text-anchor="middle" fill="#2B2724" opacity="0.75">7</text>
+  <text class="f" x="295" y="231" font-size="12.5" text-anchor="middle" fill="#8A93A0" opacity="0.55">8</text>
+  <text class="f" x="43" y="277" font-size="12.5" text-anchor="middle" fill="#C4756B" opacity="0.55">9</text>
+  <text class="f" x="85" y="277" font-size="12.5" text-anchor="middle" fill="#2B2724" opacity="0.75">10</text>
+  <text class="f" x="127" y="277" font-size="12.5" text-anchor="middle" fill="#2B2724" opacity="0.75">11</text>
+  <text class="f" x="169" y="277" font-size="12.5" text-anchor="middle" fill="#2B2724" opacity="0.75">12</text>
+  <text class="f" x="211" y="277" font-size="12.5" text-anchor="middle" fill="#2B2724" opacity="0.75">13</text>
+  <text class="f" x="253" y="277" font-size="12.5" text-anchor="middle" fill="#2B2724" opacity="0.75">14</text>
+  <text class="f" x="295" y="277" font-size="12.5" text-anchor="middle" fill="#8A93A0" opacity="0.55">15</text>
+  <circle cx="43" cy="318" r="15" fill="#C4756B"/>
+  <text class="f sb white" x="43" y="323" font-size="12.5" text-anchor="middle">16</text>
+  <circle cx="43" cy="338" r="2.5" fill="#C4756B"/>
+  <circle cx="85" cy="318" r="15" fill="none" stroke="#C4756B" stroke-width="1.4"/>
+  <text class="f sb rose" x="85" y="323" font-size="12.5" text-anchor="middle">17</text>
+  <text class="f" x="127" y="323" font-size="12.5" text-anchor="middle" fill="#2B2724" opacity="0.75">18</text>
+  <text class="f" x="169" y="323" font-size="12.5" text-anchor="middle" fill="#2B2724" opacity="0.75">19</text>
+  <text class="f" x="211" y="323" font-size="12.5" text-anchor="middle" fill="#2B2724" opacity="0.75">20</text>
+  <text class="f" x="253" y="323" font-size="12.5" text-anchor="middle" fill="#2B2724" opacity="0.75">21</text>
+  <text class="f" x="295" y="323" font-size="12.5" text-anchor="middle" fill="#8A93A0" opacity="0.55">22</text>
+  <text class="f" x="43" y="369" font-size="12.5" text-anchor="middle" fill="#C4756B" opacity="0.55">23</text>
+  <text class="f" x="85" y="369" font-size="12.5" text-anchor="middle" fill="#2B2724" opacity="0.75">24</text>
+  <text class="f" x="127" y="369" font-size="12.5" text-anchor="middle" fill="#2B2724" opacity="0.75">25</text>
+  <text class="f" x="169" y="369" font-size="12.5" text-anchor="middle" fill="#2B2724" opacity="0.75">26</text>
+  <text class="f" x="211" y="369" font-size="12.5" text-anchor="middle" fill="#2B2724" opacity="0.75">27</text>
+  <text class="f" x="253" y="369" font-size="12.5" text-anchor="middle" fill="#2B2724" opacity="0.75">28</text>
+  <text class="f" x="295" y="369" font-size="12.5" text-anchor="middle" fill="#8A93A0" opacity="0.55">29</text>
+  <text class="f" x="43" y="415" font-size="12.5" text-anchor="middle" fill="#C4756B" opacity="0.55">30</text>
+  <text class="f" x="85" y="415" font-size="12.5" text-anchor="middle" fill="#2B2724" opacity="0.75">31</text>
+
+  <rect x="20" y="452" width="300" height="86" rx="16" fill="#FFFFFF" stroke="#EAE4DF"/>
+  <text class="f b ink" x="40" y="478" font-size="14">8월 16일 (일)</text>
+  <text class="f mute" x="300" y="478" font-size="10" text-anchor="end">직접 입력</text>
+  <circle cx="44" cy="500" r="3" fill="#C4756B"/>
+  <text class="f sb ink" x="56" y="504" font-size="12">스드메 계약</text>
+  <text class="f mute" x="56" y="522" font-size="10">C 웨딩플래너 · 계약금 200,000원</text>
+
+  <text class="f b ink" x="24" y="562" font-size="13">날짜 미정</text>
+  <rect x="20" y="574" width="300" height="66" rx="16" fill="#F7F4F1"/>
+  <text class="f sb mute" x="40" y="596" font-size="11.5">달력에 못 올린 일정 6</text>
+  <text class="f sb rose" x="300" y="596" font-size="10.5" text-anchor="end">날짜 정하기</text>
+  <text class="f mute" x="40" y="614" font-size="9.5" opacity="0.85">자료의 일정은 월 단위라 날짜 칸에 올릴 수 없어요</text>
+  <text class="f mute" x="40" y="630" font-size="9.5" opacity="0.85">날짜를 정하면 여기서 달력으로 올라갑니다</text>
+
+  <line x1="0" y1="656" x2="340" y2="656" stroke="#EFE9E4"/>
+  <text class="f mute" x="47"  y="688" font-size="10.5" text-anchor="middle">홈</text>
+  <text class="f mute" x="132" y="688" font-size="10.5" text-anchor="middle">체크리스트</text>
+  <text class="f sb rose"  x="217" y="688" font-size="10.5" text-anchor="middle">일정</text>
+  <text class="f mute" x="295" y="688" font-size="10.5" text-anchor="middle">비용</text>
+  <rect x="200" y="700" width="34" height="2.5" rx="1.25" fill="#C4756B"/>
+</g>
+</svg>

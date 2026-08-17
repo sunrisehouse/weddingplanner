@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 376 756" width="376" height="756">
+<style>
+  .f { font-family: 'Apple SD Gothic Neo','Noto Sans KR','Malgun Gothic','Nanum Gothic','WenQuanYi Zen Hei',sans-serif; }
+  .ink { fill: #2B2724; }
+  .mute { fill: #94897F; }
+  .rose { fill: #C4756B; }
+  .white { fill: #FFFFFF; }
+  .b { font-weight: 700; }
+  .sb { font-weight: 600; }
+</style>
+<rect width="376" height="756" fill="#F4F1EE"/>
+<g transform="translate(18,18)">
+  <clipPath id="phone5"><rect width="340" height="720" rx="30"/></clipPath>
+  <rect width="340" height="720" rx="30" fill="#FFFFFF" stroke="#E5DED8"/>
+
+  <g clip-path="url(#phone5)">
+    <text class="f mute" x="24" y="36" font-size="10.5">9:41</text>
+    <text class="f b ink" x="24" y="76" font-size="20">비용</text>
+    <rect x="20" y="98" width="300" height="100" rx="16" fill="#2B2724"/>
+    <text class="f white" x="40" y="128" font-size="11" opacity="0.65">입력한 금액 합계</text>
+    <text class="f b white" x="40" y="166" font-size="26">2,400,000원</text>
+    <text class="f b ink" x="24" y="228" font-size="13">별도 비용</text>
+
+    <rect width="340" height="720" fill="#2B2724" opacity="0.42"/>
+
+    <!-- 바텀시트 -->
+    <rect x="0" y="248" width="340" height="480" rx="24" fill="#FFFFFF"/>
+    <rect x="154" y="264" width="32" height="4" rx="2" fill="#E0D8D2"/>
+
+    <text class="f b ink" x="24" y="304" font-size="16">드레스 헬퍼비 · 촬영</text>
+    <text class="f mute" x="24" y="323" font-size="11">촬영 당일 현장 결제</text>
+
+    <!-- 업체 -->
+    <text class="f sb ink" x="24" y="352" font-size="11">업체</text>
+    <rect x="24" y="360" width="292" height="46" rx="12" fill="#FBFAF9" stroke="#E0D8D2"/>
+    <text class="f ink" x="42" y="389" font-size="14">B 드레스샵</text>
+    <rect x="234" y="372" width="66" height="22" rx="11" fill="#F1EDE9"/>
+    <text class="f sb mute" x="267" y="387" font-size="9.5" text-anchor="middle">최근 업체</text>
+    <text class="f mute" x="24" y="422" font-size="9.5" opacity="0.8">전에 입력한 업체에서 고르거나 새로 적을 수 있어요</text>
+
+    <!-- 금액 -->
+    <text class="f sb ink" x="24" y="450" font-size="11">금액</text>
+    <rect x="24" y="458" width="292" height="56" rx="12" fill="#FBFAF9" stroke="#C4756B" stroke-width="1.6"/>
+    <text class="f mute" x="42" y="494" font-size="16">₩</text>
+    <text class="f b ink" x="66" y="496" font-size="23">200,000</text>
+    <rect x="169" y="474" width="2" height="28" fill="#C4756B"/>
+
+    <rect x="24" y="522" width="292" height="42" rx="12" fill="#FAEEEC"/>
+    <text class="f sb rose" x="40" y="540" font-size="10">계약서에 '별도'로 적힌 항목이에요</text>
+    <text class="f rose" x="40" y="555" font-size="9.5" opacity="0.75">실제로 결제한 금액을 넣어주세요</text>
+
+    <!-- 결제 방식 -->
+    <text class="f sb ink" x="24" y="588" font-size="11">결제 방식</text>
+    <rect x="24"  y="596" width="64" height="28" rx="14" fill="#2B2724"/>
+    <text class="f sb white" x="56"  y="615" font-size="10.5" text-anchor="middle">현금</text>
+    <rect x="96" y="596" width="76" height="28" rx="14" fill="#F4F1EE"/>
+    <text class="f sb mute" x="134" y="615" font-size="10.5" text-anchor="middle">계좌이체</text>
+    <rect x="180" y="596" width="56" height="28" rx="14" fill="#F4F1EE"/>
+    <text class="f sb mute" x="208" y="615" font-size="10.5" text-anchor="middle">카드</text>
+
+    <rect x="24" y="640" width="292" height="46" rx="14" fill="#C4756B"/>
+    <text class="f sb white" x="170" y="669" font-size="14" text-anchor="middle">저장</text>
+
+    <text class="f mute" x="170" y="706" font-size="9.5" text-anchor="middle" opacity="0.7">나중에 언제든 고칠 수 있어요</text>
+  </g>
+</g>
+</svg>
