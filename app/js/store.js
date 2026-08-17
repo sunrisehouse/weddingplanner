@@ -23,7 +23,39 @@ const emptyProfile = () => ({
 // 이전 버전의 웨딩홀 값 이름을 맞춘다
 const LEGACY = { contracted: 'done', touring: 'looking' };
 
-const empty = () => ({ version: 1, venues: [], profile: emptyProfile(), updatedAt: null });
+// 항목별 기록. 웨딩홀은 여러 곳을 비교하니 venues 배열로 따로 있고,
+// 스드메 · 허니문 · 혼수는 한 벌씩이라 여기 담는다.
+const emptyPlan = () => ({
+  sdm: {
+    shootDate: '',      // 촬영일 — 예식일과 별개 기준일
+    dressTour: '',
+    shootFitting: '',
+    mainFitting: '',
+    extras: {},         // 별도 항목 확인 여부
+    memo: '',
+  },
+  honeymoon: {
+    place: '', departDate: '', returnDate: '',
+    travel: null, extra: null, reserve: null,
+    memo: '',
+  },
+  honsu: {},            // 품목키: yes(준비) | no(생략) | unknown(미정)
+});
+
+const empty = () => ({
+  version: 1, venues: [], profile: emptyProfile(), plan: emptyPlan(), updatedAt: null,
+});
+
+// 중첩된 칸이라 얕은 병합으로는 새 필드가 안 채워진다
+function fillPlan(saved) {
+  const base = emptyPlan();
+  const p = saved ?? {};
+  return {
+    sdm: { ...base.sdm, ...(p.sdm ?? {}), extras: { ...(p.sdm?.extras ?? {}) } },
+    honeymoon: { ...base.honeymoon, ...(p.honeymoon ?? {}) },
+    honsu: { ...(p.honsu ?? {}) },
+  };
+}
 
 // 안 쓰는 질문의 답은 들고 다니지 않는다
 function migrate(profile) {
@@ -42,6 +74,7 @@ function read() {
     const data = JSON.parse(raw);
     if (data?.version !== 1 || !Array.isArray(data.venues)) return empty();
     data.profile = migrate({ ...emptyProfile(), ...(data.profile ?? {}) });
+    data.plan = fillPlan(data.plan);
     return data;
   } catch {
     return empty();
@@ -91,6 +124,14 @@ export const store = {
 
   setProfile(patch) {
     state.profile = { ...state.profile, ...patch };
+    commit();
+  },
+
+  // 항목별 기록 — 스드메 · 허니문 · 혼수
+  plan: (section) => (section ? state.plan[section] : state.plan),
+
+  setPlan(section, patch) {
+    state.plan[section] = { ...state.plan[section], ...patch };
     commit();
   },
 
@@ -153,6 +194,7 @@ export const store = {
       throw new Error('이 파일은 웨딩플래너 백업 파일이 아닌 것 같아요.');
     }
     data.profile = migrate({ ...emptyProfile(), ...(data.profile ?? {}) });
+    data.plan = fillPlan(data.plan);
     state = data;
     commit();
   },
@@ -286,3 +328,84 @@ export function prepStatus(profile) {
     return { ...c, answer, state, dueDate, dueMonth, left, unit };
   });
 }
+
+// ── 스드메 ────────────────────────────────────────────────────────────────
+//
+// ⚠️ 아래 항목과 숫자는 전부 자료에서 왔다.
+//    품목 구성 → docs/01-checklist.md '웨딩패키지 (스드메)'
+//    별도 항목 · 결제 · 위약금 → docs/03-contract.md (계약서 인쇄면)
+//    단계별 소요시간 · 벌수 → docs/02-schedule.md (일정표 인쇄면)
+//    새 항목이나 금액을 추측해서 넣지 말 것.
+
+// 계약서에 인쇄된 '별도' 항목. 계약 금액에 포함되지 않는다.
+// 금액은 업체마다 달라서 앱이 제시하지 않는다 — 확인했는지만 기록한다.
+export const SDM_EXTRAS = [
+  ['origin', '원본 데이터', '스튜디오 · 별도 구입'],
+  ['retouch', '선수정본', '스튜디오'],
+  ['helperShoot', '헬퍼비 (촬영)', '드레스 · 촬영과 본식에 각각 발생'],
+  ['helperMain', '헬퍼비 (본식)', '드레스'],
+  ['tourFee', '드레스 투어비', '샵당 발생 · 피팅비 5.5만원~'],
+  ['tripShoot', '출장비 (촬영)', '청담 이외 지역 · 5시간 기준'],
+  ['tripMain', '출장비 (본식)', '서울 이외 지역'],
+  ['early', '얼리스타트', '메이크업 · 8시 이전'],
+  ['late', '테이블 비용', '메이크업 · 17시 이후'],
+];
+
+// 스드메 준비 단계 (촬영일은 따로 다룬다)
+export const SDM_STEPS = [
+  ['dressTour', '드레스샵 투어', '2~3곳 · 샵당 1시간 · 4벌 피팅 후 1벌 홀딩'],
+  ['shootFitting', '촬영 가봉', '1시간 · 6벌 피팅 후 3벌 선택'],
+  ['mainFitting', '본식 가봉', '4벌 피팅 후 1벌 선택 · 부케 결정'],
+];
+
+// 계약서에 인쇄된 결제 비율과 기한
+export const SDM_DEPOSIT_PCT = 10;
+export const SDM_MID_PCT = 70;
+export const SDM_FINAL_PCT = 20;
+export const SDM_MID_DAYS = 60;      // 촬영 60일 전 중도금
+export const SDM_FINAL_DAYS = 60;    // 본식 60일 전 잔금
+export const SDM_PENALTY_DAYS = 90;  // 촬영일 기준 90일 이내 변경·취소 시 위약금
+
+// 촬영일에서 나오는 날짜들. 촬영일이 없으면 계산하지 않는다.
+export function sdmDates(plan, profile) {
+  const shoot = plan?.shootDate;
+  const okShoot = shoot && !Number.isNaN(new Date(shoot + 'T00:00:00').getTime());
+  const ceremony = profile?.ceremonyDate;
+  const okCeremony = ceremony && daysToCeremony(profile) !== null;
+  return {
+    penalty: okShoot ? shiftDays(shoot, -SDM_PENALTY_DAYS) : null,
+    mid: okShoot ? shiftDays(shoot, -SDM_MID_DAYS) : null,
+    final: okCeremony ? shiftDays(ceremony, -SDM_FINAL_DAYS) : null,
+  };
+}
+
+// ── 허니문 ────────────────────────────────────────────────────────────────
+// 자료에 적힌 것: 신혼여행비 · 여행지 추가지출비용 · 예비비용(선물비용) / 6~8개월 전
+export const HONEYMOON_COSTS = [
+  ['travel', '신혼여행비'],
+  ['extra', '여행지 추가지출'],
+  ['reserve', '예비비 (선물비용)'],
+];
+
+// 적어둔 금액만 더한다. 빈 칸은 개수만 센다.
+export function honeymoonTotal(h) {
+  let sum = 0;
+  let missing = 0;
+  for (const [key] of HONEYMOON_COSTS) {
+    const v = h?.[key];
+    if (v === null || v === '' || v === undefined) missing += 1;
+    else sum += Number(v);
+  }
+  return { sum, missing };
+}
+
+// ── 혼수 ──────────────────────────────────────────────────────────────────
+// 체크리스트 인쇄면의 혼수 품목. 시점 기준이 예식일이 아닌 것은 그대로 적어둔다.
+export const HONSU_ITEMS = [
+  ['hanbok', '한복', '신부 · 신랑 · 양가 어머님 · 촬영 2개월 전'],
+  ['ring', '웨딩반지', '커플링 · 예물'],
+  ['suit', '예복', '신랑 맞춤예복 · 턱시도 대여'],
+  ['yedan', '예단', '현금 또는 현금+예물 · 3개월 전'],
+  ['appliance', '가전 · 가구', '신혼집에 맞춰 · 입주 2~3개월 전'],
+  ['living', '주방용품 · 침구 · 생활용품', '신혼집에 맞춰 · 입주 2~3개월 전'],
+];

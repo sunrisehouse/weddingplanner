@@ -1,6 +1,9 @@
 import {
   store, blankVenue, total,
   daysToCeremony, monthsToCeremony, ceremonyAnchor, prepStatus,
+  SDM_EXTRAS, SDM_STEPS, SDM_MID_PCT, SDM_FINAL_PCT,
+  SDM_MID_DAYS, SDM_FINAL_DAYS, SDM_PENALTY_DAYS, sdmDates,
+  HONEYMOON_COSTS, honeymoonTotal, HONSU_ITEMS,
 } from './store.js';
 import { photos } from './photos.js';
 
@@ -352,13 +355,75 @@ function ddayCard(p, late) {
     </div>`;
 }
 
+// ── 항목 페이지 공통 ────────────────────────────────────────────────────
+// 준비 상태는 어느 항목 페이지에서든 바로 고친다.
+// 온보딩을 다시 걷게 하지 않는다.
+const SEG3 = [['done', '완료'], ['looking', '진행 중'], ['none', '아직']];
+
+function statusCard(key) {
+  const p = store.profile();
+  const c = prepStatus(p).find((x) => x.key === key);
+  const [txt, cls] = STATE_TXT[c.state];
+  const due = dueLabel(c);
+  const when = c.state === 'done' ? '' : due ? `${due} ${c.todo}` : c.note;
+  return `
+    <div class="card">
+      <div class="row prep ${cls}">
+        <span class="k"><b>준비 시점</b>${when ? `<em>${esc(when)}</em>` : ''}</span>
+        <span class="st">${txt}</span>
+      </div>
+      <div class="row">
+        <span class="k">진행 상태</span>
+        <span class="seg" data-status="${key}">
+          ${SEG3.map(([v, l]) =>
+            `<button type="button" data-v="${v}" aria-pressed="${p[key] === v}">${l}</button>`
+          ).join('')}
+        </span>
+      </div>
+    </div>`;
+}
+
+function bindStatus() {
+  const seg = app.querySelector('[data-status]');
+  if (!seg) return;
+  const key = seg.dataset.status;
+  seg.querySelectorAll('button').forEach((b) => {
+    b.onclick = () => { store.setProfile({ [key]: b.dataset.v }); render(); };
+  });
+}
+
+// 날짜 한 줄
+const dateRow = (id, label, value, hint = '') => `
+  <div class="row${hint ? ' withhint' : ''}">
+    <span class="k"><b>${label}</b>${hint ? `<em>${esc(hint)}</em>` : ''}</span>
+    <input id="${id}" type="date" data-date="${id}" value="${esc(value)}" />
+  </div>`;
+
+// 금액 한 줄 — 앱이 기본값을 채우지 않는다
+const numRow = (id, label, value) => `
+  <div class="row">
+    <label for="${id}">${label}</label>
+    <input id="${id}" type="number" inputmode="numeric" data-num="${id}"
+           value="${value ?? ''}" placeholder="미입력" />
+  </div>`;
+
 // ── 탭 ──────────────────────────────────────────────────────────────────
-// 최상위 화면은 홈과 웨딩홀 둘이다. 그 아래 화면(기록 폼 · 투어 준비 ·
-// 온보딩)은 뒤로 가기로 돌아가므로 탭을 붙이지 않는다.
+// 항목마다 관리 화면이 있고, 탭으로 오간다. 그 아래 화면(기록 폼 ·
+// 투어 준비 · 온보딩)은 뒤로 가기로 돌아가므로 탭을 붙이지 않는다.
 const TABS = [
   ['home', '#/', '🏠', '홈'],
   ['venue', '#/venues', '💐', '웨딩홀'],
+  ['sdm', '#/sdm', '📸', '스드메'],
+  ['honeymoon', '#/honeymoon', '✈️', '허니문'],
 ];
+
+// 준비 현황의 각 줄이 그 항목의 관리 화면으로 간다
+const ITEM_PAGE = {
+  venueStatus: '#/venues',
+  sdmStatus: '#/sdm',
+  honeymoonStatus: '#/honeymoon',
+  honsuStatus: '#/honsu',
+};
 
 function tabBar(active) {
   return `<nav class="tabs">${TABS.map(
@@ -376,6 +441,9 @@ function bindChrome() {
   });
   const when = app.querySelector('[data-when]');
   if (when) when.onclick = () => (location.hash = '#/when');
+  app.querySelectorAll('[data-goto]').forEach((b) => {
+    b.onclick = () => (location.hash = b.dataset.goto);
+  });
 }
 
 // ── 홈 — 준비 전체 ──────────────────────────────────────────────────────
@@ -399,10 +467,11 @@ function homeView() {
       // 시점을 알면 '언제까지'를 날짜(또는 달)로 준다.
       const due = dueLabel(c);
       const when = c.state === 'done' ? '' : due ? `${due} ${c.todo}` : c.note;
-      return `<div class="row prep ${cls}">
+      return `<button class="row prep link ${cls}" data-goto="${ITEM_PAGE[c.key]}">
         <span class="k"><b>${c.label}</b>${when ? `<em>${esc(when)}</em>` : ''}</span>
         <span class="st">${txt}</span>
-      </div>`;
+        <span class="arr">›</span>
+      </button>`;
     })
     .join('');
 
@@ -430,7 +499,7 @@ function homeView() {
       </div>` : ''}
 
     <h2 class="section-title">준비 현황
-      <button class="linkish" id="redo">답 수정</button>
+      <span class="hint">눌러서 관리하기</span>
     </h2>
     <div class="card">${rows}</div>
     ${late.length || next
@@ -451,13 +520,226 @@ function homeView() {
     </p>
     ${tabBar('home')}
   `;
-  $('#redo').onclick = () => (location.hash = '#/start/1');
   const setdate = $('#setdate');
   if (setdate) setdate.onclick = () => (location.hash = '#/when');
   $('#export').onclick = doExport;
   $('#import').onclick = () => $('#file').click();
   $('#file').onchange = doImport;
   bindChrome();
+}
+
+// ── 스드메 ──────────────────────────────────────────────────────────────
+// 자료의 핵심은 "촬영일이 예식일과 별개의 기준일"이라는 것이다.
+// 위약금과 중도금이 촬영일에 걸리므로 촬영일을 가장 앞에 둔다.
+function sdmView() {
+  const p = store.profile();
+  const s = store.plan('sdm');
+  const d = sdmDates(s, p);
+  const checked = SDM_EXTRAS.filter(([k]) => s.extras[k]).length;
+
+  app.innerHTML = `
+    ${brand('스드메')}
+    <p class="sub">스튜디오 · 드레스 · 헤어메이크업 · 부케</p>
+    <div style="height:18px"></div>
+    ${statusCard('sdmStatus')}
+
+    <h2 class="section-title">촬영일
+      <span class="hint">예식일과 별개 기준일</span>
+    </h2>
+    <div class="card">
+      ${dateRow('shootDate', '웨딩 촬영', s.shootDate,
+        '헤어·메이크업 3시간 + 촬영 4시간 · 의상 4벌')}
+      ${d.penalty
+        ? `<div class="row"><span class="k">위약금 시작</span>
+             <span class="v">${mdLabel(d.penalty)}</span></div>`
+        : ''}
+      ${d.mid
+        ? `<div class="row"><span class="k">중도금 ${SDM_MID_PCT}%</span>
+             <span class="v">${mdLabel(d.mid)}</span></div>`
+        : ''}
+      ${d.final
+        ? `<div class="row"><span class="k">잔금 ${SDM_FINAL_PCT}%</span>
+             <span class="v">${mdLabel(d.final)}</span></div>`
+        : ''}
+    </div>
+    <p class="formula">
+      ${s.shootDate
+        ? `위약금은 촬영 ${SDM_PENALTY_DAYS}일 전부터 · 중도금은 촬영 ${SDM_MID_DAYS}일 전 ·
+           잔금은 본식 ${SDM_FINAL_DAYS}일 전${d.final ? '' : ' (예식일을 넣으면 계산해드려요)'}`
+        : '촬영일을 넣으면 위약금 경계와 중도금 날짜를 계산해드려요'}
+    </p>
+
+    <h2 class="section-title">준비 단계</h2>
+    <div class="card">
+      ${SDM_STEPS.map(([k, label, hint]) => dateRow(k, label, s[k], hint)).join('')}
+    </div>
+
+    <h2 class="section-title">계약 금액 밖의 항목
+      <span class="hint">${checked} / ${SDM_EXTRAS.length} 확인</span>
+    </h2>
+    <div class="card">
+      ${SDM_EXTRAS.map(([k, label, hint]) => `
+        <div class="row withhint">
+          <span class="k"><b>${label}</b><em>${esc(hint)}</em></span>
+          <span class="seg" data-extra="${k}">
+            <button type="button" data-v="1" aria-pressed="${Boolean(s.extras[k])}">확인</button>
+            <button type="button" data-v="" aria-pressed="${!s.extras[k]}">아직</button>
+          </span>
+        </div>`).join('')}
+    </div>
+    <p class="note">
+      계약 총액만 보면 실제 지출을 알 수 없어요. <b>별도 항목이 ${SDM_EXTRAS.length}개</b>예요.
+      금액은 업체·시기마다 달라서 알려드리지 않아요 — 계약서에서 직접 확인하세요.
+    </p>
+
+    <h2 class="section-title">메모</h2>
+    <div class="card">
+      <div class="row" style="display:block">
+        <textarea data-memo placeholder="업체, 담당 플래너, 상담에서 들은 것 …">${esc(s.memo)}</textarea>
+      </div>
+    </div>
+    ${tabBar('sdm')}
+  `;
+
+  app.querySelectorAll('[data-date]').forEach((el) => {
+    el.onchange = () => { store.setPlan('sdm', { [el.dataset.date]: el.value }); render(); };
+  });
+  app.querySelectorAll('[data-extra]').forEach((seg) => {
+    seg.querySelectorAll('button').forEach((b) => {
+      b.onclick = () => {
+        store.setPlan('sdm', { extras: { ...s.extras, [seg.dataset.extra]: Boolean(b.dataset.v) } });
+        render();
+      };
+    });
+  });
+  const memo = app.querySelector('[data-memo]');
+  memo.oninput = () => store.setPlan('sdm', { memo: memo.value });
+  bindStatus();
+  bindChrome();
+}
+
+// ── 허니문 ──────────────────────────────────────────────────────────────
+// 자료에 적힌 것은 한 줄이다 — 신혼여행비 · 추가지출 · 예비비(선물비), 6~8개월 전.
+// 없는 항목을 만들어 넣지 않고, 날짜와 금액만 받는다.
+function honeymoonView() {
+  const p = store.profile();
+  const h = store.plan('honeymoon');
+  const { sum, missing } = honeymoonTotal(h);
+
+  // 예식일과의 간격 — 둘 다 있을 때만
+  let gap = '';
+  if (h.departDate && p.ceremonyDate) {
+    const n = Math.round(
+      (new Date(h.departDate + 'T00:00:00') - new Date(p.ceremonyDate + 'T00:00:00')) / 86400000
+    );
+    gap = n === 0 ? '예식 당일 출발' : n > 0 ? `예식 ${n}일 후 출발` : `예식 ${-n}일 전 출발`;
+  }
+  let nights = '';
+  if (h.departDate && h.returnDate) {
+    const n = Math.round(
+      (new Date(h.returnDate + 'T00:00:00') - new Date(h.departDate + 'T00:00:00')) / 86400000
+    );
+    if (n >= 0) nights = `${n}박 ${n + 1}일`;
+  }
+
+  app.innerHTML = `
+    ${brand('허니문')}
+    <p class="sub">신혼여행지 · 예비비</p>
+    <div style="height:18px"></div>
+    ${statusCard('honeymoonStatus')}
+
+    <h2 class="section-title">일정
+      ${nights ? `<span class="hint">${nights}</span>` : ''}
+    </h2>
+    <div class="card">
+      <div class="row">
+        <label for="place">여행지</label>
+        <input id="place" type="text" data-text="place" value="${esc(h.place)}"
+               placeholder="미입력" />
+      </div>
+      ${dateRow('departDate', '출발', h.departDate, gap)}
+      ${dateRow('returnDate', '귀국', h.returnDate)}
+    </div>
+
+    <h2 class="section-title">비용 <span class="hint">적어두신 것만 더해요</span></h2>
+    <div class="card">
+      ${HONEYMOON_COSTS.map(([k, label]) => numRow(k, label, h[k])).join('')}
+      <div class="row total">
+        <span class="k"><b>입력한 금액 합계</b></span>
+        <span class="v">${missing === HONEYMOON_COSTS.length ? '미입력' : won(sum) + '원'}</span>
+      </div>
+    </div>
+    ${missing && missing < HONEYMOON_COSTS.length
+      ? `<p class="formula">아직 안 적은 항목이 ${missing}개 있어요. 합계에는 안 들어갔어요.</p>`
+      : ''}
+
+    <h2 class="section-title">메모</h2>
+    <div class="card">
+      <div class="row" style="display:block">
+        <textarea data-memo placeholder="항공, 숙소, 알아본 것 …">${esc(h.memo)}</textarea>
+      </div>
+    </div>
+    ${tabBar('honeymoon')}
+  `;
+
+  app.querySelectorAll('[data-date]').forEach((el) => {
+    el.onchange = () => { store.setPlan('honeymoon', { [el.dataset.date]: el.value }); render(); };
+  });
+  app.querySelectorAll('[data-num]').forEach((el) => {
+    el.oninput = () =>
+      store.setPlan('honeymoon', { [el.dataset.num]: el.value === '' ? null : Number(el.value) });
+  });
+  const place = app.querySelector('[data-text]');
+  place.oninput = () => store.setPlan('honeymoon', { place: place.value });
+  const memo = app.querySelector('[data-memo]');
+  memo.oninput = () => store.setPlan('honeymoon', { memo: memo.value });
+  bindStatus();
+  bindChrome();
+}
+
+// ── 혼수 ────────────────────────────────────────────────────────────────
+// 탭까지 두지는 않는다. 홈의 준비 현황에서 눌러 들어온다.
+// 품목마다 할지 말지가 갈리니 준비 / 생략 / 미정을 남긴다.
+function honsuView() {
+  const items = store.plan('honsu');
+  const decided = HONSU_ITEMS.filter(([k]) => items[k] && items[k] !== 'unknown').length;
+
+  app.innerHTML = `
+    <button class="back" id="back">‹ 홈</button>
+    <h1 class="hero sm">혼수</h1>
+    <p class="hero-sub">한복 · 웨딩반지 · 예복 · 예단 · 가전/가구</p>
+    ${statusCard('honsuStatus')}
+
+    <h2 class="section-title">품목
+      <span class="hint">${decided} / ${HONSU_ITEMS.length} 정함</span>
+    </h2>
+    <div class="card">
+      ${HONSU_ITEMS.map(([k, label, hint]) => `
+        <div class="row withhint">
+          <span class="k"><b>${label}</b><em>${esc(hint)}</em></span>
+          <span class="seg" data-item="${k}">
+            ${[['yes', '준비'], ['no', '생략'], ['unknown', '미정']].map(([v, l]) =>
+              `<button type="button" data-v="${v}" aria-pressed="${(items[k] ?? 'unknown') === v}">${l}</button>`
+            ).join('')}
+          </span>
+        </div>`).join('')}
+    </div>
+    <p class="note">
+      혼수는 <b>예단 3개월 전</b>을 기준으로 챙겨드려요.
+      한복은 <b>촬영 2개월 전</b>, 가전·가구는 <b>입주 2~3개월 전</b>이라 예식일로 세지 않았어요.
+    </p>
+  `;
+
+  $('#back').onclick = () => (location.hash = '#/');
+  app.querySelectorAll('[data-item]').forEach((seg) => {
+    seg.querySelectorAll('button').forEach((b) => {
+      b.onclick = () => {
+        store.setPlan('honsu', { [seg.dataset.item]: b.dataset.v });
+        render();
+      };
+    });
+  });
+  bindStatus();
 }
 
 // ── 웨딩홀 기록이 0곳일 때 ───────────────────────────────────────────────
@@ -563,6 +845,7 @@ function venueListView() {
     <p class="sub">투어하면서 적은 것을 나란히 봅니다</p>
     <div style="height:18px"></div>
     ${ddayCard(p, venueLate)}
+    ${statusCard('venueStatus')}
 
     ${hasSample ? `
       <div class="card notice sample">
@@ -609,6 +892,7 @@ function venueListView() {
       if (confirm('예시 데이터를 지울까요?')) { store.clearSample(); render(); }
     };
   }
+  bindStatus();
   bindChrome();
 }
 
@@ -854,6 +1138,9 @@ function render() {
       ? dateView(editCtx())
       : monthView(editCtx());
   }
+  if (h === '#/sdm') return sdmView();
+  if (h === '#/honeymoon') return honeymoonView();
+  if (h === '#/honsu') return honsuView();
   if (h === '#/guide') return guideView();
   if (h === '#/new') return editView(null);
   if (h.startsWith('#/v/')) return editView(h.slice(4));
