@@ -1,4 +1,7 @@
-import { store, blankVenue, total, daysToCeremony, prepStatus } from './store.js';
+import {
+  store, blankVenue, total,
+  daysToCeremony, monthsToCeremony, ceremonyAnchor, prepStatus,
+} from './store.js';
 import { photos } from './photos.js';
 
 const $ = (sel, el = document) => el.querySelector(sel);
@@ -23,6 +26,12 @@ const mdLabel = (iso) => {
   if (Number.isNaN(d.getTime())) return '';
   const md = `${d.getMonth() + 1}월 ${d.getDate()}일`;
   return d.getFullYear() === new Date().getFullYear() ? md : `${d.getFullYear()}년 ${md}`;
+};
+
+// 달만 아는 시점
+const ymLabel = (ym) => {
+  const m = /^(\d{4})-(\d{2})$/.exec(String(ym ?? ''));
+  return m ? `${m[1]}년 ${Number(m[2])}월` : '';
 };
 
 // 서술격 조사 — 받침이 있으면 '이에요', 없으면 '예요'
@@ -52,23 +61,14 @@ const brand = (sub = '') => `
 // 답은 자료의 `비고` 열에 적힌 예약 시점과 맞춰보는 데 쓴다.
 const QUESTIONS = [
   {
-    key: 'ceremonyDateStatus',
-    title: '결혼식 날짜가\n정해지셨나요?',
-    sub: '언제까지 무엇을 해야 하는지 알려드릴 기준이에요',
-    options: [
-      { v: 'confirmed', l: '네, 확정했어요', next: 'date' },
-      { v: 'tentative', l: '가예약만 해뒀어요', next: 'date' },
-      { v: 'unknown', l: '아직요' },
-    ],
-  },
-  {
+    // 예식일은 웨딩홀을 계약해야 정해진다. 그래서 이 질문이 첫 번째다.
     key: 'venueStatus',
     title: '웨딩홀은\n정하셨나요?',
-    sub: '예식장 사용료 · 꽃장식 · 피로연 · 본식 스냅',
+    sub: '예식일이 여기서 정해져요',
     options: [
-      { v: 'done', l: '계약했어요' },
-      { v: 'looking', l: '투어 다니는 중이에요' },
-      { v: 'none', l: '아직 안 알아봤어요' },
+      { v: 'done', l: '계약했어요', next: 'date' },
+      { v: 'looking', l: '투어 다니는 중이에요', next: 'month' },
+      { v: 'none', l: '아직 안 알아봤어요', next: 'month' },
     ],
   },
   {
@@ -143,41 +143,108 @@ function questionView(i) {
     btn.onclick = () => {
       const o = q.options[Number(btn.dataset.k)];
       store.setProfile({ [q.key]: o.v });
-      if (o.next === 'date') return (location.hash = `#/start/${i + 1}-date`);
+      if (o.next) return (location.hash = `#/start/${i + 1}-${o.next}`);
       location.hash = i + 1 < TOTAL_STEPS ? `#/start/${i + 2}` : '#/start/done';
     };
   });
 }
 
-// 날짜 입력은 앞 질문의 후속 화면이라 진행 번호를 차지하지 않는다
-function dateView(i) {
+// 예식 시점 화면은 두 곳에서 쓴다.
+//   온보딩 중  — 웨딩홀 질문의 후속 화면. 진행 번호를 차지하지 않고 다음 질문으로 이어진다
+//   홈에서 수정 — 시점만 고치고 홈으로 돌아간다. 남은 질문을 다시 걷게 하지 않는다
+const stepCtx = (i) => ({
+  chrome: stepChrome(i, `#/start/${i + 1}`),
+  back: `#/start/${i + 1}`,
+  nextLabel: '다음',
+  done: () => (location.hash = i + 1 < TOTAL_STEPS ? `#/start/${i + 2}` : '#/start/done'),
+});
+
+const editCtx = () => ({
+  chrome: '<button class="back" id="ob-back">‹ 홈</button>',
+  back: '#/',
+  nextLabel: '저장',
+  done: () => (location.hash = '#/'),
+});
+
+// 웨딩홀을 계약했으면 날짜를 안다
+function dateView(ctx) {
   const p = store.profile();
   app.innerHTML = `
-    ${stepChrome(i, `#/start/${i + 1}`)}
-    <h1 class="ob-q">언제인가요?</h1>
-    <p class="ob-sub">${p.ceremonyDateStatus === 'tentative' ? '가예약한 날짜를 적어주세요' : '확정된 날짜를 적어주세요'}</p>
+    ${ctx.chrome}
+    <h1 class="ob-q">예식일이<br />언제인가요?</h1>
+    <p class="ob-sub">계약서에 적힌 날짜를 적어주세요</p>
     <div class="card">
       <div class="row">
-        <label for="cd">결혼식 날짜</label>
+        <label for="cd">예식일</label>
         <input id="cd" type="date" value="${esc(p.ceremonyDate)}" />
       </div>
     </div>
     <div class="sticky">
-      <button class="btn btn-primary" id="next">다음</button>
+      <button class="btn btn-primary" id="next">${ctx.nextLabel}</button>
       <button class="linkish ob-skip" id="later">나중에 입력할게요</button>
     </div>
   `;
-  const go = () => (location.hash = i + 1 < TOTAL_STEPS ? `#/start/${i + 2}` : '#/start/done');
-  $('#ob-back').onclick = () => (location.hash = `#/start/${i + 1}`);
-  $('#next').onclick = () => { store.setProfile({ ceremonyDate: $('#cd').value }); go(); };
-  $('#later').onclick = go;
+  $('#ob-back').onclick = () => (location.hash = ctx.back);
+  $('#next').onclick = () => {
+    // 날짜를 적었으면 달 추정치는 지운다
+    store.setProfile({ ceremonyDate: $('#cd').value, ceremonyMonth: '' });
+    ctx.done();
+  };
+  $('#later').onclick = ctx.done;
+}
+
+// 아직 미계약이면 달까지만 안다. 없는 날짜를 만들어 넣지 않는다.
+function monthView(ctx) {
+  const p = store.profile();
+  const now = new Date();
+  const cur = { y: now.getFullYear(), m: now.getMonth() + 1 };
+  const saved = /^(\d{4})-(\d{2})$/.exec(p.ceremonyMonth || '');
+  const sel = saved ? { y: Number(saved[1]), m: Number(saved[2]) } : null;
+
+  const years = [cur.y, cur.y + 1, cur.y + 2, cur.y + 3];
+  const yOpts = years
+    .map((y) => `<option value="${y}" ${sel?.y === y ? 'selected' : ''}>${y}년</option>`)
+    .join('');
+  const mOpts = Array.from({ length: 12 }, (_, k) => k + 1)
+    .map((m) => `<option value="${m}" ${sel?.m === m ? 'selected' : ''}>${m}월</option>`)
+    .join('');
+
+  app.innerHTML = `
+    ${ctx.chrome}
+    <h1 class="ob-q">예식은 언제쯤<br />생각하세요?</h1>
+    <p class="ob-sub">달만 정해두시면 돼요. 웨딩홀 예약하시면 날짜로 바꿔드릴게요</p>
+    <div class="card">
+      <div class="row">
+        <label for="cy">예상 시기</label>
+        <span class="ym">
+          <select id="cy">${yOpts}</select>
+          <select id="cm">${mOpts}</select>
+        </span>
+      </div>
+    </div>
+    <div class="sticky">
+      <button class="btn btn-primary" id="next">${ctx.nextLabel}</button>
+      <button class="linkish ob-skip" id="later">아직 모르겠어요</button>
+    </div>
+  `;
+  if (!sel) $('#cm').value = String(cur.m);
+  $('#ob-back').onclick = () => (location.hash = ctx.back);
+  $('#next').onclick = () => {
+    const ym = `${$('#cy').value}-${String($('#cm').value).padStart(2, '0')}`;
+    store.setProfile({ ceremonyMonth: ym, ceremonyDate: '' });
+    ctx.done();
+  };
+  $('#later').onclick = () => {
+    store.setProfile({ ceremonyMonth: '', ceremonyDate: '' });
+    ctx.done();
+  };
 }
 
 const STATE_TXT = {
   done: ['완료', 'ok'],
   late: ['서둘러야 해요', 'late'],
   ok: ['시간 있어요', 'ok'],
-  nodate: ['예식일 정하면 알려드려요', 'mute'],
+  nodate: ['시기 정하면 알려드려요', 'mute'],
   unanswered: ['안 정하셨어요', 'mute'],
 };
 
@@ -193,34 +260,42 @@ function nextStep(p) {
 function doneView() {
   const p = store.profile();
   store.finishOnboarding();
-  const d = daysToCeremony(p);
+  const a = ceremonyAnchor(p);
   const prep = prepStatus(p);
   const late = prep.filter((c) => c.state === 'late');
 
-  const dline = d === null
-    ? ''
-    : `<div class="row do"><span class="k">결혼식까지</span><span class="v">D-${d}</span></div>`;
+  const dline = a.kind === 'date'
+    ? `<div class="row do"><span class="k">예식일까지</span><span class="v">D-${daysToCeremony(p)}</span></div>`
+    : a.kind === 'month'
+      ? `<div class="row do"><span class="k">예식 예정</span>
+           <span class="v">${esc(ymLabel(a.ym))}</span></div>`
+      : '';
 
   const rows = prep
     .map((c) => {
       const [txt, cls] = STATE_TXT[c.state];
+      const due = dueLabel(c);
+      const when = c.state === 'done' ? '' : due ? `${due} ${c.todo}` : c.note;
       return `<div class="row prep ${cls}">
-        <span class="k"><b>${c.label}</b><em>${esc(c.note)}</em></span>
+        <span class="k"><b>${c.label}</b>${when ? `<em>${esc(when)}</em>` : ''}</span>
         <span class="st">${txt}</span>
       </div>`;
     })
     .join('');
 
   // 시점이 지난 것만 짚는다. 무엇을 먼저 하라고 순서를 정해주지는 않는다.
+  const remain = a.kind === 'date'
+    ? `${Math.floor(daysToCeremony(p) / 30)}개월`
+    : `${monthsToCeremony(p)}개월`;
   const lead = late.length
     ? `<div class="card notice gap">
          <p><b>${late.map((c) => esc(c.label)).join(' · ')}</b> 예약을 서둘러주세요.</p>
          <p>${late.map((c) => `${esc(c.label)} ${esc(c.by)}`).join(' · ')}까지 예약하셔야 하는데
-            지금 ${Math.floor(d / 30)}개월 남았어요.</p>
+            지금 ${remain} 남았어요.</p>
        </div>`
-    : d === null
-      ? `<div class="card notice gap"><p><b>예식일을 정하시면 시점을 챙겨드릴게요.</b></p>
-         <p>예약 시점은 모두 예식일을 기준으로 세어드려요.</p></div>`
+    : a.kind === 'none'
+      ? `<div class="card notice gap"><p><b>예식 시기를 정하시면 시점을 챙겨드릴게요.</b></p>
+         <p>달만 정해두셔도 됩니다.</p></div>`
       : '';
 
   const caveats = prep.filter((c) => c.caveat && c.state !== 'done');
@@ -244,19 +319,36 @@ function doneView() {
   $('#home').onclick = () => (location.hash = '#/');
 }
 
-// 예식일 카드 — 홈과 웨딩홀 화면이 같이 쓴다
+// 마감 문구 — 기준이 날짜면 날짜로, 달뿐이면 달로. 날짜를 지어내지 않는다.
+const dueLabel = (c) =>
+  c.dueDate ? `${mdLabel(c.dueDate)}까지` : c.dueMonth ? `${ymLabel(c.dueMonth)}까지` : '';
+
+const leftLabel = (c) =>
+  c.left === null ? '' : c.unit === 'day' ? `${c.left}일 남았어요` : `${c.left}개월 남았어요`;
+
+// 예식 시점 카드 — 홈과 웨딩홀 화면이 같이 쓴다
 function ddayCard(p, late) {
-  const d = daysToCeremony(p);
-  if (d === null) return '';
+  const a = ceremonyAnchor(p);
+  if (a.kind === 'none') return '';
+
+  const head = a.kind === 'date'
+    ? `<span class="n">D-${daysToCeremony(p)}</span>
+       <span class="t">${esc(dateLabel(a.iso))}${
+         p.venueStatus === 'done' ? '' : ' · 예정'
+       }</span>`
+    : `<span class="n">${esc(ymLabel(a.ym))}</span>
+       <span class="t">예정 · 약 ${monthsToCeremony(p)}개월 남음</span>`;
+
   return `
     <div class="dday">
-      <span class="n">D-${d}</span>
-      <span class="t">${esc(dateLabel(p.ceremonyDate))}${
-        p.ceremonyDateStatus === 'tentative' ? ' · 가예약' : ''
-      }</span>
+      ${head}
       ${late.length
         ? `<span class="warn">${late.map((c) => esc(c.label)).join(' · ')} 예약을 서둘러주세요</span>`
         : ''}
+      ${a.kind === 'month'
+        ? '<span class="hintline">웨딩홀 예약하시면 날짜로 바꿔드릴게요</span>'
+        : ''}
+      <button class="linkish when" data-when>시기 수정</button>
     </div>`;
 }
 
@@ -277,10 +369,13 @@ function tabBar(active) {
   ).join('')}</nav>`;
 }
 
-function bindTabs() {
+// 탭과 화면 공통 요소를 연결한다
+function bindChrome() {
   app.querySelectorAll('[data-tab]').forEach((b) => {
     b.onclick = () => (location.hash = b.dataset.tab);
   });
+  const when = app.querySelector('[data-when]');
+  if (when) when.onclick = () => (location.hash = '#/when');
 }
 
 // ── 홈 — 준비 전체 ──────────────────────────────────────────────────────
@@ -288,24 +383,22 @@ function bindTabs() {
 // 웨딩홀처럼 특정 항목을 다루는 화면은 탭에서 들어간다.
 function homeView() {
   const p = store.profile();
+  const anchor = ceremonyAnchor(p);
   const prep = prepStatus(p);
   const late = prep.filter((c) => c.state === 'late');
 
   // 다음에 다가오는 마감 — 이미 지난 것과 끝낸 것은 뺀다
   const next = prep
-    .filter((c) => c.state === 'ok' && c.daysLeft !== null)
-    .sort((a, b) => a.daysLeft - b.daysLeft)[0];
+    .filter((c) => c.state === 'ok' && c.left !== null)
+    .sort((a, b) => a.left - b.left)[0];
 
   const rows = prep
     .map((c) => {
       const [txt, cls] = STATE_TXT[c.state];
       // 끝낸 항목은 시점을 다시 말하지 않는다.
-      // 예식일을 알면 '언제까지'를 날짜로 준다.
-      const when = c.state === 'done'
-        ? ''
-        : c.dueDate
-          ? `${mdLabel(c.dueDate)}까지 ${c.todo}`
-          : c.note;
+      // 시점을 알면 '언제까지'를 날짜(또는 달)로 준다.
+      const due = dueLabel(c);
+      const when = c.state === 'done' ? '' : due ? `${due} ${c.todo}` : c.note;
       return `<div class="row prep ${cls}">
         <span class="k"><b>${c.label}</b>${when ? `<em>${esc(when)}</em>` : ''}</span>
         <span class="st">${txt}</span>
@@ -317,16 +410,23 @@ function homeView() {
     ${brand('결혼 준비')}
     <div style="height:18px"></div>
     ${ddayCard(p, late)}
-    ${daysToCeremony(p) === null
+    ${anchor.kind === 'none'
       ? `<div class="card notice">
-           <p><b>예식일을 정하시면 시점을 챙겨드릴게요.</b></p>
-           <p>예약 시점은 모두 예식일을 기준으로 세어드려요.</p>
+           <p><b>예식 시기를 정하시면 시점을 챙겨드릴게요.</b></p>
+           <p>달만 정해두셔도 됩니다. 예약 시점은 모두 예식일을 기준으로 세어드려요.</p>
+           <button class="btn btn-quiet" id="setdate">예식 시기 정하기</button>
+         </div>` : ''}
+    ${anchor.kind === 'month' && p.venueStatus === 'done'
+      ? `<div class="card notice">
+           <p><b>웨딩홀을 계약하셨으면 예식일이 있어요.</b></p>
+           <p>날짜를 넣어주시면 달이 아니라 날짜로 챙겨드릴게요.</p>
+           <button class="btn btn-quiet" id="setdate">예식일 넣기</button>
          </div>` : ''}
 
     ${next ? `
       <div class="card notice ok">
         <p><b>다음은 ${esc(next.label)}${ida(next.label)}.</b></p>
-        <p>${mdLabel(next.dueDate)}까지 ${esc(next.todo)} · ${next.daysLeft}일 남았어요.</p>
+        <p>${dueLabel(next)} ${esc(next.todo)} · ${leftLabel(next)}</p>
       </div>` : ''}
 
     <h2 class="section-title">준비 현황
@@ -334,7 +434,9 @@ function homeView() {
     </h2>
     <div class="card">${rows}</div>
     ${late.length || next
-      ? '<p class="note">마감일은 예식일에서 거꾸로 세어드린 날짜예요.</p>'
+      ? `<p class="note">${anchor.kind === 'month'
+          ? '예상 시기에서 거꾸로 세어드린 달이에요. 날짜가 정해지면 날짜로 바뀝니다.'
+          : '마감일은 예식일에서 거꾸로 세어드린 날짜예요.'}</p>`
       : ''}
 
     <div class="btn-row">
@@ -350,10 +452,12 @@ function homeView() {
     ${tabBar('home')}
   `;
   $('#redo').onclick = () => (location.hash = '#/start/1');
+  const setdate = $('#setdate');
+  if (setdate) setdate.onclick = () => (location.hash = '#/when');
   $('#export').onclick = doExport;
   $('#import').onclick = () => $('#file').click();
   $('#file').onchange = doImport;
-  bindTabs();
+  bindChrome();
 }
 
 // ── 웨딩홀 기록이 0곳일 때 ───────────────────────────────────────────────
@@ -395,7 +499,7 @@ function venueEmptyView() {
   $('#go-record').onclick = () => (location.hash = '#/new');
   $('#go-guide').onclick = () => (location.hash = '#/guide');
   $('#demo').onclick = () => { store.loadSample(); location.hash = '#/venues'; render(); };
-  bindTabs();
+  bindChrome();
 }
 
 // ── 웨딩홀 투어 준비 ─────────────────────────────────────────────────────
@@ -505,7 +609,7 @@ function venueListView() {
       if (confirm('예시 데이터를 지울까요?')) { store.clearSample(); render(); }
     };
   }
-  bindTabs();
+  bindChrome();
 }
 
 function compareTable(venues) {
@@ -730,15 +834,26 @@ function render() {
 
   // 온보딩
   if (h.startsWith('#/start')) {
-    const m = h.match(/^#\/start\/(\d+)(-date)?$/);
+    const m = h.match(/^#\/start\/(\d+)(-date|-month)?$/);
     if (h === '#/start/done') return doneView();
-    if (m) return m[2] ? dateView(Number(m[1]) - 1) : questionView(Number(m[1]) - 1);
+    if (m) {
+      const i = Number(m[1]) - 1;
+      if (m[2] === '-date') return dateView(stepCtx(i));
+      if (m[2] === '-month') return monthView(stepCtx(i));
+      return questionView(i);
+    }
     return (location.hash = '#/start/1');
   }
 
   // 첫 방문이면 온보딩부터
   if (!store.onboarded() && !store.venues().length) return (location.hash = '#/start/1');
 
+  // 예식 시점만 고치는 화면 — 웨딩홀 계약 여부로 정밀도가 갈린다
+  if (h === '#/when') {
+    return store.profile().venueStatus === 'done'
+      ? dateView(editCtx())
+      : monthView(editCtx());
+  }
   if (h === '#/guide') return guideView();
   if (h === '#/new') return editView(null);
   if (h.startsWith('#/v/')) return editView(h.slice(4));

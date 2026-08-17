@@ -264,6 +264,15 @@ h1.ob-q { font-size: 24px; line-height: 1.42; margin: 40px 0 0; letter-spacing: 
   flex-basis: 100%; font-size: 11px; color: var(--rose);
   background: var(--rose-bg); border-radius: 8px; padding: 6px 9px; margin-top: 4px;
 }
+.dday .hintline { flex-basis: 100%; font-size: 11px; color: var(--mute); margin-top: 2px; }
+
+/* 년 · 월 선택 */
+.ym { display: flex; gap: 8px; }
+.ym select {
+  font: inherit; font-size: 14px; color: var(--ink);
+  background: var(--field); border: 1px solid var(--line); border-radius: 10px;
+  padding: 9px 10px;
+}
 
 /* 준비 시점 요약 — 자료 기준과 본인 답을 한 줄에 놓는다 */
 .row.prep { align-items: flex-start; gap: 10px; }
@@ -276,3 +285,5 @@ h1.ob-q { font-size: 24px; line-height: 1.42; margin: 40px 0 0; letter-spacing: 
 }
 .row.prep.ok .st { background: #eef3ee; color: var(--green); }
 .row.prep.late .st { background: var(--rose-bg); color: var(--rose); }
+
+.dday .when { flex: none; margin-left: auto; font-size: 11px; }

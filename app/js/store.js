@@ -6,11 +6,14 @@
 const KEY = 'weddingplanner.v1';
 
 // 자료(체크리스트)의 `구분` 열이 그대로 온보딩 질문이 된다.
-// 준비 상태는 세 항목 모두 같은 값을 쓴다: done | looking | none
+// 준비 상태는 네 항목 모두 같은 값을 쓴다: done | looking | none
+//
+// 예식 시점은 두 칸으로 나눠 담는다. 웨딩홀을 계약해야 날짜가 나오므로
+// 미계약이면 달만 알고, 그때 ceremonyDate는 비워 둔다.
 const emptyProfile = () => ({
-  ceremonyDateStatus: null,   // confirmed | tentative | unknown
-  ceremonyDate: '',
-  venueStatus: null,          // 웨딩홀
+  venueStatus: null,          // 웨딩홀 — 이 답이 예식일 정밀도를 정한다
+  ceremonyDate: '',           // YYYY-MM-DD (계약 후 확정)
+  ceremonyMonth: '',          // YYYY-MM (미계약 · 예상 시기)
   sdmStatus: null,            // 스드메 (웨딩패키지)
   honeymoonStatus: null,      // 허니문
   honsuStatus: null,          // 혼수
@@ -28,6 +31,7 @@ function migrate(profile) {
   if (LEGACY[p.venueStatus]) p.venueStatus = LEGACY[p.venueStatus];
   delete p.guestEstimate;
   delete p.pyebaek;
+  delete p.ceremonyDateStatus;   // 확정/가예약은 venueStatus로 알 수 있다
   return p;
 }
 
@@ -163,7 +167,7 @@ export function total(v) {
   return Number(hallFee) + Number(flowers) + Number(guarantee) * Number(mealPrice);
 }
 
-// 예식일까지 남은 일수. 없으면 null.
+// 예식일까지 남은 일수. 확정 날짜가 없으면 null.
 export function daysToCeremony(profile) {
   if (!profile?.ceremonyDate) return null;
   const d = new Date(profile.ceremonyDate + 'T00:00:00');
@@ -173,32 +177,72 @@ export function daysToCeremony(profile) {
   return Math.round((d - today) / 86400000);
 }
 
+// 예식 달까지 남은 개월. 달만 아는 경우에 쓴다.
+export function monthsToCeremony(profile) {
+  const ym = parseYM(profile?.ceremonyMonth);
+  if (!ym) return null;
+  const now = new Date();
+  return (ym.y - now.getFullYear()) * 12 + (ym.m - (now.getMonth() + 1));
+}
+
+function parseYM(s) {
+  const m = /^(\d{4})-(\d{2})$/.exec(String(s ?? ''));
+  if (!m) return null;
+  const y = Number(m[1]);
+  const mo = Number(m[2]);
+  return mo >= 1 && mo <= 12 ? { y, m: mo } : null;
+}
+
+const shiftDays = (iso, n) =>
+  new Date(new Date(iso + 'T00:00:00').getTime() + n * 86400000)
+    .toISOString().slice(0, 10);
+
+function shiftMonths(ymStr, n) {
+  const ym = parseYM(ymStr);
+  if (!ym) return null;
+  const t = ym.y * 12 + (ym.m - 1) + n;
+  return `${Math.floor(t / 12)}-${String((t % 12) + 1).padStart(2, '0')}`;
+}
+
+// 예식 시점의 기준.
+//
+// 예식일은 웨딩홀을 계약해야 정해진다. 그래서 두 가지 정밀도를 다룬다.
+//   date  — 웨딩홀 계약 후. 날짜까지 안다
+//   month — 아직 미계약. 달만 안다. 없는 날짜를 만들어 쓰지 않는다
+export function ceremonyAnchor(profile) {
+  if (profile?.ceremonyDate && daysToCeremony(profile) !== null) {
+    return { kind: 'date', iso: profile.ceremonyDate };
+  }
+  if (parseYM(profile?.ceremonyMonth)) {
+    return { kind: 'month', ym: profile.ceremonyMonth };
+  }
+  return { kind: 'none' };
+}
+
 // 큰 항목(체크리스트 `구분` 열)과 예약 시점.
 //
-// ⚠️ days · note의 숫자는 전부 박람회 자료 `비고` 열에서 왔다.
+// ⚠️ months · note의 숫자는 전부 박람회 자료 `비고` 열에서 왔다.
 //    새 숫자를 추측해서 넣지 말 것. 근거는 docs/01-checklist.md.
 //    화면 문구는 앱이 직접 안내하는 말투로 쓴다 —
 //    "자료에 이렇게 적혀 있어요"가 아니라 "이때까지 예약하세요".
-//
-// days = 예식일까지 남은 일수 (한 달 30일)
 export const PREP = [
   {
-    key: 'venueStatus', label: '웨딩홀', days: 300,
+    key: 'venueStatus', label: '웨딩홀', months: 10,
     note: '늦어도 10개월 전에 예약하세요', by: '10개월 전', todo: '예약하세요',
     items: '예식장 사용료 · 꽃장식 · 피로연 · 본식 스냅',
   },
   {
-    key: 'sdmStatus', label: '스드메', days: 300,
+    key: 'sdmStatus', label: '스드메', months: 10,
     note: '10~12개월 전에 예약하세요', by: '10개월 전', todo: '예약하세요',
     items: '스튜디오 · 드레스 · 헤어메이크업 · 부케',
   },
   {
-    key: 'honeymoonStatus', label: '허니문', days: 180,
+    key: 'honeymoonStatus', label: '허니문', months: 6,
     note: '6~8개월 전에 예약하세요', by: '6개월 전', todo: '예약하세요',
     items: '신혼여행비 · 예비비',
   },
   {
-    key: 'honsuStatus', label: '혼수', days: 90,
+    key: 'honsuStatus', label: '혼수', months: 3,
     note: '예단은 3개월 전에 준비하세요', by: '3개월 전', todo: '예단 준비하세요',
     items: '한복 · 웨딩반지 · 예복 · 예단 · 가전/가구',
     caveat: '한복은 촬영 2개월 전, 가전·가구는 입주 2~3개월 전에 맞추세요. '
@@ -206,26 +250,39 @@ export const PREP = [
   },
 ];
 
-// 본인이 답한 상태와 자료의 시점을 맞춰본다.
-// 앱이 순서를 정해주는 게 아니라, 자료에 적힌 시점이 지났는지만 알린다.
+// 본인이 답한 상태를 예약 시점과 맞춰본다.
+// 앱이 순서를 정해주는 게 아니라, 시점이 지났는지만 알린다.
+//
+// 기준이 달뿐이면 마감도 달로만 낸다. 날짜를 지어내지 않는다.
 export function prepStatus(profile) {
-  const d = daysToCeremony(profile);
-  const base = profile?.ceremonyDate ? new Date(profile.ceremonyDate + 'T00:00:00') : null;
-  const ok = base && !Number.isNaN(base.getTime());
+  const a = ceremonyAnchor(profile);
+  const days = a.kind === 'date' ? daysToCeremony(profile) : null;
+  const months = a.kind === 'month' ? monthsToCeremony(profile) : null;
+
   return PREP.map((c) => {
     const answer = profile?.[c.key] ?? null;
+    let dueDate = null;
+    let dueMonth = null;
+    let left = null;
+    let unit = null;
+
+    if (a.kind === 'date') {
+      dueDate = shiftDays(a.iso, -c.months * 30);   // 한 달 30일로 센다
+      left = days - c.months * 30;
+      unit = 'day';
+    } else if (a.kind === 'month') {
+      dueMonth = shiftMonths(a.ym, -c.months);
+      left = months - c.months;
+      unit = 'month';
+    }
+
     let state;
     if (answer === 'done') state = 'done';
     else if (answer === null) state = 'unanswered';   // 안 물어봤거나 건너뛴 것
-    else if (d === null) state = 'nodate';            // 예식일을 모르면 시점을 못 따진다
-    else if (d < c.days) state = 'late';
+    else if (a.kind === 'none') state = 'nodate';     // 시점을 모르면 따질 수 없다
+    else if (left < 0) state = 'late';
     else state = 'ok';
-    // 마감일 = 예식일에서 시점만큼 앞당긴 날
-    const due = ok ? new Date(base.getTime() - c.days * 86400000) : null;
-    return {
-      ...c, answer, state, d,
-      dueDate: due ? due.toISOString().slice(0, 10) : null,
-      daysLeft: d === null ? null : d - c.days,
-    };
+
+    return { ...c, answer, state, dueDate, dueMonth, left, unit };
   });
 }
