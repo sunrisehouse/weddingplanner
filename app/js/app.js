@@ -72,7 +72,7 @@ const QUESTIONS = [
     sub: '예식일이 여기서 정해져요',
     options: [
       { v: 'done', l: '계약했어요', next: 'date' },
-      { v: 'looking', l: '투어 다니는 중이에요', next: 'month' },
+      { v: 'looking', l: '알아보는 중이에요', next: 'month' },
       { v: 'none', l: '아직 안 알아봤어요', next: 'month' },
     ],
   },
@@ -256,9 +256,9 @@ const STATE_TXT = {
 // 다음에 할 일은 앱이 정해서 준다. 목록을 던져놓고 알아서 보라고 하지 않는다.
 function nextStep(p) {
   if (p.venueStatus === 'none' || p.venueStatus === null) {
-    return { hash: '#/guide', label: '웨딩홀 투어 준비하기' };
+    return { hash: '#/guide', label: '웨딩홀에서 확인할 것 보기' };
   }
-  if (p.venueStatus === 'looking') return { hash: '#/new', label: '투어 기록 시작하기' };
+  if (p.venueStatus === 'looking') return { hash: '#/new', label: '웨딩홀 기록 시작하기' };
   return { hash: '#/new', label: '계약한 웨딩홀 기록하기' };
 }
 
@@ -411,7 +411,7 @@ const numRow = (id, label, value) => `
 
 // ── 탭 ──────────────────────────────────────────────────────────────────
 // 항목마다 관리 화면이 있고, 탭으로 오간다. 그 아래 화면(기록 폼 ·
-// 투어 준비 · 온보딩)은 뒤로 가기로 돌아가므로 탭을 붙이지 않는다.
+// 확인할 것 · 온보딩)은 뒤로 가기로 돌아가므로 탭을 붙이지 않는다.
 const TABS = [
   ['home', '#/', '🏠', '홈'],
   ['venue', '#/venues', '💐', '웨딩홀'],
@@ -707,7 +707,7 @@ function shopView(part) {
     </h2>
     ${list.length
       ? `<div class="card">${list.map(card).join('')}</div>`
-      : '<p class="note">투어 다녀오신 곳을 적어두시면 나란히 보여드려요.</p>'}
+      : '<p class="note">알아본 곳을 적어두시면 나란히 보여드려요.</p>'}
 
     <button class="btn btn-ghost" id="add" style="margin-top:14px">＋ 샵 추가</button>
   `;
@@ -1414,8 +1414,8 @@ function honsuView() {
 function venueEmptyView() {
   app.innerHTML = `
     ${brand('웨딩홀')}
-    <p class="sub">투어를 적어두면 나란히 비교해드려요</p>
-    <h1 class="hero sm" style="margin-top:22px">투어 다녀오셨나요?</h1>
+    <p class="sub">알아본 곳을 나란히 비교해드려요</p>
+    <h1 class="hero sm" style="margin-top:22px">웨딩홀 정보를<br />적어주세요</h1>
     <p class="hero-sub">
       받은 견적을 그대로 적으면 <b>실제로 얼마인지</b> 계산해드려요.
       홀 사용료만 보면 식대가 빠져 실제 금액을 알 수 없습니다.
@@ -1425,16 +1425,16 @@ function venueEmptyView() {
       <button class="choice-row" id="go-record">
         <span class="ico">📝</span>
         <span class="txt">
-          <b>투어 다녀왔어요</b>
-          <em>받은 견적을 적어둘게요</em>
+          <b>웨딩홀 기록하기</b>
+          <em>알아본 곳을 적어둘게요</em>
         </span>
         <span class="arr">›</span>
       </button>
       <button class="choice-row" id="go-guide">
         <span class="ico">🔍</span>
         <span class="txt">
-          <b>아직 안 가봤어요</b>
-          <em>투어 준비부터 챙겨드릴게요</em>
+          <b>무엇을 확인할지 보기</b>
+          <em>홀에 물어볼 것을 짚어드려요</em>
         </span>
         <span class="arr">›</span>
       </button>
@@ -1451,15 +1451,14 @@ function venueEmptyView() {
   bindChrome();
 }
 
-// ── 웨딩홀 투어 준비 ─────────────────────────────────────────────────────
+// ── 웨딩홀에서 확인할 것 ─────────────────────────────────────────────────
 // 항목은 박람회 자료의 웨딩홀 구성에서 왔지만, 화면에서는 앱이 직접 챙겨준다.
 function guideView() {
   app.innerHTML = `
     <button class="back" id="back">‹ 웨딩홀</button>
-    <h1 class="hero sm">웨딩홀 투어 준비</h1>
+    <h1 class="hero sm">웨딩홀에서 확인할 것</h1>
     <p class="hero-sub">
-      투어 가시면 이것만 확인하시면 돼요.
-      확인한 그대로 비교표가 됩니다.
+      이것만 물어보시면 돼요. 확인한 그대로 비교표가 됩니다.
     </p>
 
     <h2 class="section-title">금액</h2>
@@ -1488,7 +1487,7 @@ function guideView() {
     <p class="note">다 못 물어봐도 괜찮아요. 기록할 때 <b>모름</b>으로 남기시면 돼요.</p>
 
     <div class="sticky">
-      <button class="btn btn-primary" id="record">투어 기록하기</button>
+      <button class="btn btn-primary" id="record">웨딩홀 기록하기</button>
     </div>
   `;
   $('#back').onclick = () => (location.hash = '#/venues');
@@ -1496,7 +1495,7 @@ function guideView() {
 }
 
 // ── 웨딩홀 목록 + 비교 ──────────────────────────────────────────────────
-// 스드메와 같은 단계를 탄다. 알아보기 → 투어 비교 → 예약 확정.
+// 스드메와 같은 단계를 탄다. 알아보기 → 비교 → 예약 확정.
 function venueListView() {
   const venues = store.venues();
   if (!venues.length) return venueEmptyView();
@@ -1517,7 +1516,7 @@ function venueListView() {
             isPicked ? ' <span class="chip on">예약</span>' : ''
           }${v.sample ? ' <span class="chip">예시</span>' : ''}</div>
           <div class="meta">${
-            v.tourDate ? esc(dateLabel(v.tourDate)) + ' 투어' : '투어 날짜 미입력'
+            v.tourDate ? esc(dateLabel(v.tourDate)) : '날짜 미입력'
           }</div>
           <div class="sum${t === null ? ' none' : ''}">${
             t === null ? '금액이 덜 채워졌어요' : won(t) + '원'
@@ -1530,7 +1529,7 @@ function venueListView() {
 
   app.innerHTML = `
     ${brand('웨딩홀')}
-    <p class="sub">${picked ? '예약한 홀과 비교했던 곳' : '투어하면서 적은 것을 나란히 봅니다'}</p>
+    <p class="sub">${picked ? '예약한 홀과 비교했던 곳' : '알아본 곳을 나란히 봅니다'}</p>
     <div style="height:18px"></div>
     ${ddayCard(p, venueLate)}
 
@@ -1560,7 +1559,7 @@ function venueListView() {
 
     ${picked && others.length
       ? `<h2 class="section-title">비교했던 곳 <span class="hint">${others.length}곳</span></h2>`
-      : `<h2 class="section-title">투어 기록 <span class="hint">${venues.length}곳</span></h2>`}
+      : `<h2 class="section-title">웨딩홀 기록 <span class="hint">${venues.length}곳</span></h2>`}
     ${others.length ? `<div class="card">${others.map(card).join('')}</div>` : ''}
 
     <button class="btn btn-ghost" id="add" style="margin-top:14px">＋ 웨딩홀 기록하기</button>
@@ -1569,7 +1568,7 @@ function venueListView() {
       ? compareTable(venues)
       : `<p class="note">한 곳 더 기록하면 <b>비교표</b>가 나타납니다.</p>`}
 
-    <p class="note"><button class="linkish" id="guide">투어에서 확인할 것 보기</button></p>
+    <p class="note"><button class="linkish" id="guide">웨딩홀에서 확인할 것 보기</button></p>
     ${tabBar('venue')}
   `;
 
@@ -1655,9 +1654,9 @@ function editView(id) {
     </div>`;
 
   app.innerHTML = `
-    <button class="back" id="back">‹ 투어 기록</button>
+    <button class="back" id="back">‹ 웨딩홀</button>
     <h1 class="hero sm">웨딩홀 기록</h1>
-    <p class="hero-sub">투어하면서 바로 적어보세요 · 자동 저장돼요</p>
+    <p class="hero-sub">알아본 것을 그대로 적어보세요 · 자동 저장돼요</p>
 
     <div class="card">
       <div class="row">
@@ -1666,7 +1665,7 @@ function editView(id) {
                placeholder="예: 강남 ○○홀" ${isNew ? 'autofocus' : ''} />
       </div>
       <div class="row">
-        <label for="tourDate">투어 날짜</label>
+        <label for="tourDate">알아본 날짜</label>
         <input id="tourDate" type="date" data-k="tourDate" value="${esc(v.tourDate)}" />
       </div>
     </div>
