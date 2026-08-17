@@ -394,3 +394,13 @@ details.more .note { margin-top: 8px; }
   .row.optrow .seg { display: flex; margin-top: 9px; }
   .row.optrow .seg button { flex: 1; padding: 6px 3px; }
 }
+
+/* 값 칸 기본 — 비교표 칩(.row.prep .st)은 그대로 둔다 */
+.row .st { flex: none; font-size: 12.5px; font-weight: 600; text-align: right; }
+.row .st.mute { color: var(--mute); font-weight: 400; }
+
+/* 정한 샵이 있는 줄 */
+.row.link.ok .st { color: var(--green); }
+.row.tight .linkish { font-size: 11.5px; }
+.linkish.mute { color: var(--mute); }
+.cand .row.tight { display: flex; justify-content: space-between; padding: 10px 18px 14px; }

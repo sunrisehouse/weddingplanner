@@ -2,6 +2,7 @@ import {
   store, blankVenue, blankSdm, total,
   daysToCeremony, monthsToCeremony, ceremonyAnchor, prepStatus,
   SDM_PARTS, SDM_SERVICES, SDM_EXTRAS, extrasOf, SDM_STEPS, SDM_MID_PCT, SDM_FINAL_PCT,
+  SHOP_PARTS, SHOP_FEE, blankShop,
   SDM_MID_DAYS, SDM_FINAL_DAYS, SDM_PENALTY_DAYS, sdmDates, sdmTotal,
   choiceCount, HONEYMOON_COSTS, honeymoonTotal,
   HONSU_CHOICES, HOME_ITEMS, honsuCount, homeCount, honsuDates,
@@ -623,6 +624,120 @@ function extrasDetails() {
     </details>`;
 }
 
+// 샵 정하기 — 세 줄만 두고 자세한 건 눌러 들어간다
+function shopCard() {
+  const picked = store.profile().pickedShops ?? {};
+  const done = SHOP_PARTS.filter(([k]) => picked[k]).length;
+
+  return `
+    <h2 class="section-title">샵 정하기
+      <span class="hint">${done} / ${SHOP_PARTS.length} 정함</span>
+    </h2>
+    <div class="card">
+      ${SHOP_PARTS.map(([key, label]) => {
+        const chosen = picked[key] ? store.shop(picked[key]) : null;
+        const n = store.shops(key).length;
+        const state = chosen
+          ? esc(chosen.name || '이름 없는 샵')
+          : n
+            ? `${n}곳 비교 중`
+            : '아직';
+        return `<button class="row link${chosen ? ' ok' : ''}" data-goto="#/sdm/shop/${key}">
+          <span class="k"><b>${label}</b></span>
+          <span class="st${chosen ? '' : ' mute'}">${state}</span>
+          <span class="arr">›</span>
+        </button>`;
+      }).join('')}
+    </div>`;
+}
+
+// 샵 한 곳 — 후보 목록 + 정하기
+function shopView(part) {
+  const def = SHOP_PARTS.find(([k]) => k === part);
+  if (!def) return (location.hash = '#/sdm');
+  const [, label, hint] = def;
+  const [feeLabel, feeHint] = SHOP_FEE[part];
+  const list = store.shops(part);
+  const pickedId = store.profile().pickedShops?.[part] ?? null;
+  const picked = pickedId ? store.shop(pickedId) : null;
+
+  const card = (x) => `
+    <div class="cand">
+      <div class="row">
+        <label for="n-${x.id}">샵 이름</label>
+        <input id="n-${x.id}" type="text" data-shop="${x.id}" data-f="name"
+               value="${esc(x.name)}" placeholder="미입력" />
+      </div>
+      <div class="row">
+        <label for="d-${x.id}">방문 날짜</label>
+        <input id="d-${x.id}" type="date" data-shop="${x.id}" data-f="visitDate"
+               value="${esc(x.visitDate)}" />
+      </div>
+      <div class="row${feeHint ? ' withhint' : ''}">
+        ${feeHint
+          ? `<span class="k"><b>${feeLabel}</b><em>${esc(feeHint)}</em></span>`
+          : `<label for="f-${x.id}">${feeLabel}</label>`}
+        <input id="f-${x.id}" type="number" inputmode="numeric" data-shop="${x.id}" data-f="fee"
+               value="${x.fee ?? ''}" placeholder="미입력" />
+      </div>
+      <div class="row" style="display:block">
+        <textarea data-shop="${x.id}" data-f="memo"
+                  placeholder="마음에 든 점, 걸린 점 …">${esc(x.memo)}</textarea>
+      </div>
+      <div class="row tight">
+        ${pickedId === x.id
+          ? '<button class="linkish" data-unpickshop="' + part + '">다시 비교하기</button>'
+          : `<button class="linkish" data-pickshop="${part}" data-id="${x.id}">이 샵으로 정했어요</button>`}
+        <button class="linkish mute" data-delshop="${x.id}">삭제</button>
+      </div>
+    </div>`;
+
+  app.innerHTML = `
+    <button class="back" id="back">‹ 스드메</button>
+    <h1 class="hero sm">${label}</h1>
+    <p class="hero-sub">${esc(hint)}</p>
+
+    ${picked ? `
+      <div class="card notice ok">
+        <p><b>${esc(picked.name || '이름 없는 샵')}</b>로 정하셨어요.</p>
+      </div>` : ''}
+
+    <h2 class="section-title">${picked ? '비교했던 곳' : '후보'}
+      <span class="hint">${list.length}곳</span>
+    </h2>
+    ${list.length
+      ? `<div class="card">${list.map(card).join('')}</div>`
+      : '<p class="note">투어 다녀오신 곳을 적어두시면 나란히 보여드려요.</p>'}
+
+    <button class="btn btn-ghost" id="add" style="margin-top:14px">＋ 샵 추가</button>
+  `;
+
+  $('#back').onclick = () => (location.hash = '#/sdm');
+  $('#add').onclick = () => { store.saveShop(blankShop(part)); render(); };
+
+  app.querySelectorAll('[data-shop]').forEach((el) => {
+    const save = () => {
+      const x = { ...store.shop(el.dataset.shop) };
+      const f = el.dataset.f;
+      x[f] = el.type === 'number' ? (el.value === '' ? null : Number(el.value)) : el.value;
+      store.saveShop(x);
+    };
+    el.oninput = save;
+    if (el.type === 'date') el.onchange = save;   // 날짜 선택기는 change만 보내는 경우가 있다
+  });
+  app.querySelectorAll('[data-pickshop]').forEach((b) => {
+    b.onclick = () => { store.pickShop(b.dataset.pickshop, b.dataset.id); render(); };
+  });
+  app.querySelectorAll('[data-unpickshop]').forEach((b) => {
+    b.onclick = () => { store.unpickShop(b.dataset.unpickshop); render(); };
+  });
+  app.querySelectorAll('[data-delshop]').forEach((b) => {
+    b.onclick = () => {
+      if (confirm('이 샵 기록을 지울까요?')) { store.removeShop(b.dataset.delshop); render(); }
+    };
+  });
+}
+
 function bindChoices() {
   const sdm = () => store.plan('sdm');
   const patch = (o) => store.setPlan('sdm', { choices: { ...sdm().choices, ...o } });
@@ -673,8 +788,8 @@ function sdmIntro(head) {
   app.innerHTML = `
     ${head}
     ${statusCard('sdmStatus')}
-
     ${choiceCard()}
+    ${shopCard()}
 
     <div class="sticky">
       <button class="btn btn-primary" id="add">업체 기록 시작하기</button>
@@ -693,6 +808,7 @@ function sdmCompare(head, list) {
     ${head}
     ${statusCard('sdmStatus')}
     ${choiceCard()}
+    ${shopCard()}
 
     <h2 class="section-title">받은 견적
       <span class="hint">${list.length}곳</span>
@@ -762,6 +878,7 @@ function sdmContracted(head, p, picked, list) {
     </p>
 
     ${choiceCard()}
+    ${shopCard()}
 
     <h2 class="section-title">준비 단계</h2>
     <div class="card">
@@ -1728,6 +1845,8 @@ function render() {
       : monthView(editCtx());
   }
   if (h === '#/sdm') return sdmView();
+  const shop = h.match(/^#\/sdm\/shop\/(\w+)$/);
+  if (shop) return shopView(shop[1]);
   if (h === '#/sdm/new') return sdmEdit(null);
   if (h.startsWith('#/sdm/v/')) return sdmEdit(h.slice(8));
   if (h === '#/honeymoon') return honeymoonView();

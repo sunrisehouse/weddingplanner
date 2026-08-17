@@ -17,6 +17,7 @@ const emptyProfile = () => ({
   ceremonyMonth: '',          // YYYY-MM (미계약 · 예상 시기)
   sdmStatus: null,            // 스드메 (웨딩패키지)
   pickedSdmId: null,          // 계약을 확정한 스드메 업체
+  pickedShops: {},            // 품목별로 정한 샵 — studio | dress | makeup
   honeymoonStatus: null,      // 허니문
   honsuStatus: null,          // 혼수
   onboardedAt: null,
@@ -48,7 +49,8 @@ const emptyPlan = () => ({
 const empty = () => ({
   version: 1,
   venues: [],        // 웨딩홀 후보
-  sdmVendors: [],    // 스드메 후보
+  sdmVendors: [],    // 스드메 견적 후보
+  shops: [],         // 스튜디오 · 드레스샵 · 메이크업샵 후보
   profile: emptyProfile(),
   plan: emptyPlan(),
   updatedAt: null,
@@ -113,6 +115,7 @@ function migrate(profile) {
   delete p.guestEstimate;
   delete p.pyebaek;
   delete p.ceremonyDateStatus;   // 확정/가예약은 venueStatus로 알 수 있다
+  p.pickedShops = { ...(p.pickedShops ?? {}) };
   return p;
 }
 
@@ -126,6 +129,7 @@ function read() {
     data.plan = fillPlan(data.plan);
     if (!Array.isArray(data.sdmVendors)) data.sdmVendors = [];
     data.sdmVendors = data.sdmVendors.map(migrateSdm);
+    if (!Array.isArray(data.shops)) data.shops = [];
     return data;
   } catch (e) {
     // 저장본이 깨진 경우엔 빈 상태로 시작하되, 코드 버그는 감추지 않는다
@@ -234,6 +238,44 @@ export const store = {
     commit();
   },
 
+  // ── 샵 후보 (스튜디오 · 드레스샵 · 메이크업샵) ───────────────────────
+  shops: (part) => (part ? state.shops.filter((x) => x.part === part) : state.shops),
+  shop: (id) => state.shops.find((x) => x.id === id) ?? null,
+
+  saveShop(x) {
+    const i = state.shops.findIndex((y) => y.id === x.id);
+    if (i === -1) state.shops.push(x);
+    else state.shops[i] = x;
+    commit();
+    return x;
+  },
+
+  removeShop(id) {
+    const gone = state.shops.find((x) => x.id === id);
+    state.shops = state.shops.filter((x) => x.id !== id);
+    if (gone && state.profile.pickedShops?.[gone.part] === id) {
+      const picked = { ...state.profile.pickedShops };
+      delete picked[gone.part];
+      state.profile = { ...state.profile, pickedShops: picked };
+    }
+    commit();
+  },
+
+  pickShop(part, id) {
+    state.profile = {
+      ...state.profile,
+      pickedShops: { ...state.profile.pickedShops, [part]: id },
+    };
+    commit();
+  },
+
+  unpickShop(part) {
+    const picked = { ...state.profile.pickedShops };
+    delete picked[part];
+    state.profile = { ...state.profile, pickedShops: picked };
+    commit();
+  },
+
   // ── 비교 → 예약 확정 ─────────────────────────────────────────────────
   // 확정하면 진행 상태가 같이 넘어간다. 두 곳에 따로 적게 하지 않는다.
   pick(kind, id) {
@@ -289,6 +331,7 @@ export const store = {
     data.plan = fillPlan(data.plan);
     if (!Array.isArray(data.sdmVendors)) data.sdmVendors = [];
     data.sdmVendors = data.sdmVendors.map(migrateSdm);
+    if (!Array.isArray(data.shops)) data.shops = [];
     state = data;
     commit();
   },
@@ -512,9 +555,33 @@ export const SDM_EXTRAS = [
 
 export const extrasOf = (part) => SDM_EXTRAS.filter((x) => x.part === part);
 
+// 스드메는 샵도 각각 정해야 한다.
+// 자료의 6단계에 '드레스샵 투어 2~3곳 · 샵당 1시간 · 4벌 피팅 후 1벌 홀딩'이 있다.
+export const SHOP_PARTS = [
+  ['studio', '스튜디오', '촬영할 곳'],
+  ['dress', '드레스샵', '2~3곳 투어 · 샵당 1시간 · 4벌 피팅 후 1벌 홀딩'],
+  ['makeup', '메이크업샵', '촬영 · 본식'],
+];
+
+// 자료에 적힌 비용은 드레스샵 피팅비뿐이다. 나머지는 라벨만 둔다.
+export const SHOP_FEE = {
+  studio: ['비용', ''],
+  dress: ['피팅비', '샵당 발생 · 5.5만원~'],
+  makeup: ['비용', ''],
+};
+
+export const blankShop = (part) => ({
+  id: uid(),
+  part,
+  name: '',
+  visitDate: '',
+  fee: null,
+  memo: '',
+});
+
 // 스드메 준비 단계 (촬영일은 따로 다룬다)
+// 드레스샵 투어 날짜는 샵마다 따로 적으므로 여기 두지 않는다
 export const SDM_STEPS = [
-  ['dressTour', '드레스샵 투어', '2~3곳 · 샵당 1시간 · 4벌 피팅 후 1벌 홀딩'],
   ['shootFitting', '촬영 가봉', '1시간 · 6벌 피팅 후 3벌 선택'],
   ['mainFitting', '본식 가봉', '4벌 피팅 후 1벌 선택 · 부케 결정'],
 ];
