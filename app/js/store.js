@@ -75,6 +75,31 @@ export const store = {
     commit();
   },
 
+  // 예시 데이터 — 비교표는 2곳 이상이어야 의미가 생기는데, 첫 방문자는 0곳이다.
+  // 값을 만들어 넣는 대신 sample 표시를 달아 언제든 지울 수 있게 한다.
+  loadSample() {
+    if (state.venues.some((v) => v.sample)) return;
+    state.venues.push(
+      {
+        ...blankVenue(), sample: true, name: '예시 A홀', tourDate: '',
+        hallFee: 5000000, flowers: 1200000, mealPrice: 68000, guarantee: 200,
+        bridalRoom: 'yes', pyebaekRoom: 'yes', supplies: 'yes',
+        memo: '예시로 넣어둔 값이에요. 실제 시세가 아닙니다.',
+      },
+      {
+        ...blankVenue(), sample: true, name: '예시 B홀', tourDate: '',
+        mealPrice: 62000, bridalRoom: 'yes', pyebaekRoom: 'no',
+        memo: '일부만 적힌 상태는 이렇게 보입니다.',
+      }
+    );
+    commit();
+  },
+
+  clearSample() {
+    state.venues = state.venues.filter((v) => !v.sample);
+    commit();
+  },
+
   // 내보내기 / 불러오기 — localStorage는 이 브라우저에만 있으니 백업 수단이 반드시 필요하다
   exportJSON() {
     return JSON.stringify(state, null, 2);

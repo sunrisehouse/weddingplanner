@@ -23,58 +23,182 @@ const INCLUDES = [
 ];
 const TRI = [['yes', '있음'], ['no', '없음'], ['unknown', '모름']];
 
+const brand = (sub = '') => `
+  <header>
+    <p class="brand">💍 웨딩플래너</p>
+    ${sub ? `<h1>${sub}</h1>` : ''}
+  </header>`;
+
+// ── 첫 방문 ──────────────────────────────────────────────────────────────
+// 기록이 하나도 없을 때가 곧 첫 화면이다. 별도 온보딩을 클릭시키지 않고
+// 이 화면이 "이게 뭔지 · 지금 뭘 하면 되는지"를 대신한다.
+function introView() {
+  app.innerHTML = `
+    ${brand()}
+    <h1 class="hero">웨딩홀 투어,<br />적어두고 나란히 비교하세요</h1>
+    <p class="hero-sub">
+      받은 견적을 그대로 적으면 <b>실제로 얼마인지</b> 계산해드려요.
+      홀 사용료만 보면 식대가 빠져 실제 금액을 알 수 없습니다.
+    </p>
+
+    <div class="card choice">
+      <button class="choice-row" id="go-record">
+        <span class="ico">📝</span>
+        <span class="txt">
+          <b>투어 다녀왔어요</b>
+          <em>받은 견적을 적어둘게요</em>
+        </span>
+        <span class="arr">›</span>
+      </button>
+      <button class="choice-row" id="go-guide">
+        <span class="ico">🔍</span>
+        <span class="txt">
+          <b>아직 안 가봤어요</b>
+          <em>투어에서 뭘 물어볼지 볼게요</em>
+        </span>
+        <span class="arr">›</span>
+      </button>
+    </div>
+
+    <button class="btn btn-quiet" id="demo" style="margin-top:12px">
+      예시로 먼저 둘러보기
+    </button>
+
+    <h2 class="section-title">이 앱이 하는 일</h2>
+    <div class="card">
+      <div class="row do"><span class="k">여러 홀을 나란히 비교</span><span class="mark yes">✓</span></div>
+      <div class="row do"><span class="k">홀 사용료 + 꽃장식 + (보증인원 × 식대) 합산</span><span class="mark yes">✓</span></div>
+      <div class="row do"><span class="k">투어에서 물어볼 것 정리</span><span class="mark yes">✓</span></div>
+      <div class="row do"><span class="k">시세 · 평균가 알려주기</span><span class="mark no">✕</span></div>
+      <div class="row do"><span class="k">업체 추천 · 순위 매기기</span><span class="mark no">✕</span></div>
+    </div>
+    <p class="note">
+      가격은 지역 · 시기마다 달라서, 어떤 기준값을 보여줘도 틀린 숫자를 믿게 만듭니다.
+      그래서 <b>적어두신 것만</b> 계산합니다.
+    </p>
+
+    <div class="card notice">
+      <p><b>기록은 이 브라우저에만 저장돼요.</b></p>
+      <p>다른 기기나 상대방 폰에서는 보이지 않습니다.
+         투어 다녀오시면 <b>내보내기</b>로 백업해두세요.</p>
+    </div>
+  `;
+  $('#go-record').onclick = () => (location.hash = '#/new');
+  $('#go-guide').onclick = () => (location.hash = '#/guide');
+  $('#demo').onclick = () => { store.loadSample(); location.hash = '#/'; render(); };
+}
+
+// ── 투어에서 물어볼 것 ───────────────────────────────────────────────────
+function guideView() {
+  app.innerHTML = `
+    <button class="back" id="back">‹ 처음으로</button>
+    <h1 class="hero sm">투어에서 물어볼 것</h1>
+    <p class="hero-sub">
+      박람회 배포 자료의 웨딩홀 항목을 그대로 옮겼습니다.
+      이 항목들이 그대로 비교표가 됩니다.
+    </p>
+
+    <h2 class="section-title">금액</h2>
+    <div class="card">
+      <div class="row ask"><span class="k"><b>홀 사용료</b><em>신부대기실 · 폐백실 · 혼구용품이 포함인지</em></span></div>
+      <div class="row ask"><span class="k"><b>꽃장식</b><em>단상 · 꽃길 · 꽃아치 · 테이블세팅까지 어디까지인지</em></span></div>
+      <div class="row ask"><span class="k"><b>식대 (1인)</b><em>가장 크게 벌어지는 항목이에요</em></span></div>
+      <div class="row ask"><span class="k"><b>최소 보증인원</b><em>몇 명부터 계약이 되는지</em></span></div>
+    </div>
+    <p class="formula">홀 사용료 + 꽃장식 + (보증인원 × 식대) = 예상 합계</p>
+
+    <h2 class="section-title">시설</h2>
+    <div class="card">
+      <div class="row ask"><span class="k"><b>신부대기실</b></span></div>
+      <div class="row ask"><span class="k"><b>폐백실</b><em>폐백을 하실 거면 꼭 확인하세요</em></span></div>
+      <div class="row ask"><span class="k"><b>혼구용품</b></span></div>
+    </div>
+
+    <h2 class="section-title">놓치기 쉬운 것</h2>
+    <div class="card">
+      <div class="row ask"><span class="k"><b>보증인원 최종 결정 시점</b><em>자료 기준 예식 2~3주 전에 확정합니다</em></span></div>
+      <div class="row ask"><span class="k"><b>예약 시점</b><em>자료 기준 최소 10개월 전 예약</em></span></div>
+      <div class="row ask"><span class="k"><b>위약금 기준</b><em>며칠 전부터 발생하는지</em></span></div>
+    </div>
+
+    <p class="note">
+      투어 중에 다 못 물어보는 게 정상이에요. 기록할 때 <b>모름</b>으로 남겨두면
+      나중에 "안 물어본 것"과 "없는 것"이 구분됩니다.
+    </p>
+
+    <div class="sticky">
+      <button class="btn btn-primary" id="record">투어 기록하기</button>
+    </div>
+  `;
+  $('#back').onclick = () => (location.hash = '#/');
+  $('#record').onclick = () => (location.hash = '#/new');
+}
+
 // ── 목록 + 비교 ──────────────────────────────────────────────────────────
 function listView() {
   const venues = store.venues();
+  if (!venues.length) return introView();
 
-  const cards = venues.length
-    ? `<div class="card">${venues
-        .map((v) => {
-          const t = total(v);
-          return `<button class="venue" data-go="${v.id}">
-            <div class="name">${esc(v.name || '이름 없는 웨딩홀')}</div>
-            <div class="meta">${v.tourDate ? esc(dateLabel(v.tourDate)) + ' 투어' : '투어 날짜 미입력'}</div>
-            <div class="sum${t === null ? ' none' : ''}">${
-              t === null ? '금액이 덜 채워졌어요' : won(t) + '원'
-            }</div>
-          </button>`;
-        })
-        .join('')}</div>`
-    : `<div class="card"><div class="empty-state">
-         아직 기록한 웨딩홀이 없어요.<br />투어 다녀오시면 여기에 쌓입니다.
-       </div></div>`;
+  const hasSample = venues.some((v) => v.sample);
 
   app.innerHTML = `
-    <header>
-      <h1>웨딩홀</h1>
-      <p class="sub">투어하면서 적은 것을 나란히 봅니다</p>
-    </header>
+    ${brand('웨딩홀')}
+    <p class="sub">투어하면서 적은 것을 나란히 봅니다</p>
 
-    ${cards}
+    ${hasSample ? `
+      <div class="card notice sample">
+        <p><b>예시 데이터로 둘러보는 중이에요.</b></p>
+        <p>비교표가 어떻게 보이는지 보여드리려고 넣어둔 값입니다.</p>
+        <button class="btn btn-quiet" id="clear-sample">지우고 내 기록 시작하기</button>
+      </div>` : ''}
+
+    <div class="card">${venues
+      .map((v) => {
+        const t = total(v);
+        return `<button class="venue" data-go="${v.id}">
+          <div class="name">${esc(v.name || '이름 없는 웨딩홀')}${
+            v.sample ? ' <span class="chip">예시</span>' : ''
+          }</div>
+          <div class="meta">${v.tourDate ? esc(dateLabel(v.tourDate)) + ' 투어' : '투어 날짜 미입력'}</div>
+          <div class="sum${t === null ? ' none' : ''}">${
+            t === null ? '금액이 덜 채워졌어요' : won(t) + '원'
+          }</div>
+        </button>`;
+      })
+      .join('')}</div>
 
     <button class="btn btn-ghost" id="add" style="margin-top:14px">＋ 웨딩홀 기록하기</button>
 
-    ${venues.length >= 2 ? compareTable(venues) : ''}
-
-    <p class="note">
-      앱은 순위를 매기거나 추천하지 않아요. 적어두신 것을 나란히 놓아드릴 뿐이에요.<br />
-      기록은 <b>이 브라우저에만</b> 저장돼요. 다른 기기에서 보시려면 내보내기를 쓰세요.
-    </p>
+    ${venues.length >= 2
+      ? compareTable(venues)
+      : `<p class="note">한 곳 더 기록하면 <b>비교표</b>가 나타납니다.</p>`}
 
     <div class="btn-row">
       <button class="btn btn-quiet" id="export">내보내기</button>
       <button class="btn btn-quiet" id="import">불러오기</button>
     </div>
     <input type="file" id="file" accept="application/json" hidden />
+
+    <p class="note">
+      앱은 순위를 매기거나 추천하지 않아요. 적어두신 것을 나란히 놓아드릴 뿐이에요.<br />
+      기록은 <b>이 브라우저에만</b> 저장돼요. 다른 기기에서 보시려면 내보내기를 쓰세요.<br />
+      <button class="linkish" id="guide">투어에서 물어볼 것 다시 보기</button>
+    </p>
   `;
 
   $('#add').onclick = () => (location.hash = '#/new');
+  $('#guide').onclick = () => (location.hash = '#/guide');
   app.querySelectorAll('[data-go]').forEach((b) => {
     b.onclick = () => (location.hash = '#/v/' + b.dataset.go);
   });
   $('#export').onclick = doExport;
   $('#import').onclick = () => $('#file').click();
   $('#file').onchange = doImport;
+  if (hasSample) {
+    $('#clear-sample').onclick = () => {
+      if (confirm('예시 데이터를 지울까요?')) { store.clearSample(); render(); }
+    };
+  }
 }
 
 function compareTable(venues) {
@@ -132,6 +256,7 @@ function editView(id) {
   const existing = id ? store.venue(id) : null;
   if (id && !existing) return (location.hash = '#/');
   const v = existing ? structuredClone(existing) : blankVenue();
+  const isNew = !existing;
 
   const moneyRow = (label, key, unit = '') => `
     <div class="row">
@@ -141,16 +266,15 @@ function editView(id) {
     </div>`;
 
   app.innerHTML = `
-    <header>
-      <button class="back" id="back">‹ 웨딩홀</button>
-      <h1>웨딩홀 기록</h1>
-      <p class="sub">투어하면서 바로 적어보세요 · 자동 저장돼요</p>
-    </header>
+    <button class="back" id="back">‹ 웨딩홀</button>
+    <h1 class="hero sm">웨딩홀 기록</h1>
+    <p class="hero-sub">투어하면서 바로 적어보세요 · 자동 저장돼요</p>
 
     <div class="card">
       <div class="row">
         <label for="name">홀 이름</label>
-        <input id="name" type="text" data-k="name" value="${esc(v.name)}" placeholder="예: 강남 ○○홀" />
+        <input id="name" type="text" data-k="name" value="${esc(v.name)}"
+               placeholder="예: 강남 ○○홀" ${isNew ? 'autofocus' : ''} />
       </div>
       <div class="row">
         <label for="tourDate">투어 날짜</label>
@@ -158,7 +282,7 @@ function editView(id) {
       </div>
     </div>
 
-    <h2 class="section-title">금액 <span class="hint">받은 견적 그대로 적어주세요</span></h2>
+    <h2 class="section-title">금액 <span class="hint">받은 견적 그대로</span></h2>
     <div class="card">
       ${moneyRow('홀 사용료', 'hallFee')}
       ${moneyRow('꽃장식', 'flowers')}
@@ -168,7 +292,7 @@ function editView(id) {
     </div>
     <p class="formula">홀 사용료 + 꽃장식 + (보증인원 × 식대) · 보증인원은 2~3주 전 최종 결정</p>
 
-    <h2 class="section-title">포함 여부</h2>
+    <h2 class="section-title">포함 여부 <span class="hint">못 물어봤으면 모름</span></h2>
     <div class="card">
       ${INCLUDES.map(([key, label]) => `
         <div class="row">
@@ -181,7 +305,7 @@ function editView(id) {
         </div>`).join('')}
     </div>
 
-    <h2 class="section-title">메모 <span class="hint">견적서를 찍어두면 나중에 편해요</span></h2>
+    <h2 class="section-title">메모 <span class="hint">견적서를 찍어두면 편해요</span></h2>
     <div class="card">
       <div class="row" style="display:block">
         <textarea data-k="memo" placeholder="주차, 예식 간격, 대기실 분위기 …">${esc(v.memo)}</textarea>
@@ -202,12 +326,12 @@ function editView(id) {
 
   const refreshTotal = () => {
     const t = total(v);
-    $('#total').textContent = t === null ? '입력이 덜 됐어요' : won(t) + '원';
-    $('#total').style.color = t === null ? 'var(--mute)' : 'var(--rose)';
-    $('#total').style.fontSize = t === null ? '12px' : '16px';
+    const el = $('#total');
+    el.textContent = t === null ? '입력이 덜 됐어요' : won(t) + '원';
+    el.style.color = t === null ? 'var(--mute)' : 'var(--rose)';
+    el.style.fontSize = t === null ? '12px' : '16px';
   };
 
-  // 자동 저장 — 투어 중 앱을 닫아도 날아가지 않게
   const persist = () => { store.save(v); };
 
   app.querySelectorAll('[data-k]').forEach((el) => {
@@ -295,6 +419,8 @@ async function doImport(e) {
 // ── 라우터 ───────────────────────────────────────────────────────────────
 function render() {
   const h = location.hash;
+  scrollTo(0, 0);
+  if (h === '#/guide') return guideView();
   if (h === '#/new') return editView(null);
   if (h.startsWith('#/v/')) return editView(h.slice(4));
   return listView();

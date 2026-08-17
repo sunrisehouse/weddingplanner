@@ -158,3 +158,47 @@ tr.total-row td.num { color: var(--rose); }
 .thumbs img { width: 62px; height: 62px; object-fit: cover; border-radius: 10px; border: 1px solid var(--line); }
 .danger { color: var(--rose); background: none; border: 0; font: inherit; font-size: 12px;
           cursor: pointer; padding: 16px 2px; display: block; width: 100%; text-align: center; }
+
+/* ── 브랜드 · 첫 화면 ─────────────────────────────────── */
+.brand { font-size: 12.5px; font-weight: 700; color: var(--rose); margin: 0; letter-spacing: -0.01em; }
+h1.hero { font-size: 25px; line-height: 1.38; margin: 16px 0 0; letter-spacing: -0.02em; }
+h1.hero.sm { font-size: 21px; margin-top: 6px; }
+.hero-sub { color: var(--mute); font-size: 13px; line-height: 1.68; margin: 10px 0 22px; }
+.hero-sub b { color: var(--ink); font-weight: 600; }
+
+.choice { overflow: hidden; }
+.choice-row {
+  display: flex; align-items: center; gap: 14px; width: 100%;
+  padding: 17px 18px; border: 0; background: none; font: inherit;
+  color: inherit; cursor: pointer; text-align: left;
+}
+.choice-row + .choice-row { border-top: 1px solid var(--line-soft); }
+.choice-row:active { background: var(--field); }
+.choice-row .ico { font-size: 21px; line-height: 1; }
+.choice-row .txt { flex: 1; display: flex; flex-direction: column; gap: 3px; }
+.choice-row .txt b { font-size: 14.5px; }
+.choice-row .txt em { font-style: normal; font-size: 11.5px; color: var(--mute); }
+.choice-row .arr { color: #cdc4bc; font-size: 19px; }
+
+.row.do { justify-content: space-between; }
+.row.do .k { font-size: 12.5px; }
+.mark { font-size: 13px; font-weight: 700; }
+.mark.yes { color: var(--green); }
+.mark.no { color: #c9bfb6; }
+
+.row.ask { display: block; }
+.row.ask .k { display: flex; flex-direction: column; gap: 4px; }
+.row.ask .k b { font-size: 13.5px; }
+.row.ask .k em { font-style: normal; font-size: 11.5px; color: var(--mute); line-height: 1.55; }
+
+.card.notice { background: var(--rose-bg); border-color: #f0dcd8; padding: 16px 18px; }
+.card.notice p { margin: 0; font-size: 12px; line-height: 1.7; color: var(--rose); }
+.card.notice p + p { margin-top: 5px; opacity: 0.88; }
+.card.notice p b { font-weight: 700; }
+.card.notice .btn { margin-top: 12px; background: #fff; color: var(--rose); }
+.card.notice.sample { margin-bottom: 16px; }
+
+.linkish {
+  border: 0; background: none; padding: 0; font: inherit; font-size: 11px;
+  color: var(--rose); text-decoration: underline; cursor: pointer;
+}
