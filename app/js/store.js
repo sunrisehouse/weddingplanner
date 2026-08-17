@@ -28,8 +28,9 @@ const LEGACY = { contracted: 'done', touring: 'looking' };
 // 항목별 기록. 웨딩홀은 여러 곳을 비교하니 venues 배열로 따로 있고,
 // 스드메 · 허니문 · 혼수는 한 벌씩이라 여기 담는다.
 const emptyPlan = () => ({
-  // 계약 후에 의미가 생기는 것들. 후보별 견적은 sdmVendors에 있다.
+  // 후보별 견적은 sdmVendors에 있고, 여기엔 우리가 정한 것과 일정이 담긴다.
   sdm: {
+    choices: {},        // 정해야 하는 것 (계약서 빈칸)
     shootDate: '',      // 촬영일 — 예식일과 별개 기준일
     dressTour: '',
     shootFitting: '',
@@ -58,10 +59,24 @@ function fillPlan(saved) {
   const base = emptyPlan();
   const p = saved ?? {};
   return {
-    sdm: { ...base.sdm, ...(p.sdm ?? {}) },
+    sdm: {
+      ...base.sdm, ...(p.sdm ?? {}),
+      choices: { ...emptyChoices(), ...(p.sdm?.choices ?? {}),
+                 services: { ...(p.sdm?.choices?.services ?? {}) } },
+    },
     honeymoon: { ...base.honeymoon, ...(p.honeymoon ?? {}) },
     honsu: { ...(p.honsu ?? {}) },
   };
+}
+
+// 정해져 오는 패키지가 아니라 항목마다 정하는 것이므로 '패키지 금액'을 버렸다
+function migrateSdm(v) {
+  const x = { ...v };
+  if (x.packagePrice !== undefined) {
+    if (x.quotePrice === undefined || x.quotePrice === null) x.quotePrice = x.packagePrice;
+    delete x.packagePrice;
+  }
+  return x;
 }
 
 // 안 쓰는 질문의 답은 들고 다니지 않는다
@@ -83,8 +98,11 @@ function read() {
     data.profile = migrate({ ...emptyProfile(), ...(data.profile ?? {}) });
     data.plan = fillPlan(data.plan);
     if (!Array.isArray(data.sdmVendors)) data.sdmVendors = [];
+    data.sdmVendors = data.sdmVendors.map(migrateSdm);
     return data;
-  } catch {
+  } catch (e) {
+    // 저장본이 깨진 경우엔 빈 상태로 시작하되, 코드 버그는 감추지 않는다
+    console.error('저장본을 읽지 못했습니다', e);
     return empty();
   }
 }
@@ -243,6 +261,7 @@ export const store = {
     data.profile = migrate({ ...emptyProfile(), ...(data.profile ?? {}) });
     data.plan = fillPlan(data.plan);
     if (!Array.isArray(data.sdmVendors)) data.sdmVendors = [];
+    data.sdmVendors = data.sdmVendors.map(migrateSdm);
     state = data;
     commit();
   },
@@ -390,7 +409,7 @@ export const blankSdm = () => ({
   id: uid(),
   name: '',
   consultDate: '',
-  packagePrice: null,   // 패키지(계약) 금액
+  quotePrice: null,     // 업체가 준 견적 금액
   shootDress: null,     // 촬영 드레스 벌수
   mainDress: null,      // 본식 드레스 벌수
   album: '',            // 앨범 · 액자 구성
@@ -398,14 +417,43 @@ export const blankSdm = () => ({
   memo: '',
 });
 
-// 패키지에 들어 있는 구성 (체크리스트 인쇄면)
-export const SDM_PACKAGE = [
-  ['스튜디오', '촬영 · 20p 앨범 1권 + 20R 액자'],
-  ['드레스 (촬영)', '신부 화이트 3벌 / 신랑 턱시도'],
-  ['드레스 (본식)', '신부 화이트 1벌 / 신랑 턱시도'],
-  ['헤어 & 메이크업', '촬영 · 본식 각 1회 (신랑 · 신부)'],
-  ['부케', '부케 1 · 부토니아 1 · 코사지 6'],
+// 정해야 하는 것.
+//
+// 스드메는 정해진 패키지를 사는 게 아니다. 계약서가 빈칸으로 되어 있고
+// (드레스 촬영 ( )벌 / 본식 ( )벌, 헤어메이크업 각 ( )회, 앨범 ( )p ( )권)
+// 그 빈칸을 채우는 일이 곧 결정이다. 자료의 값은 힌트로만 보여준다.
+// 함수 선언이라 호이스팅된다 — read()가 모듈 위쪽에서 부른다
+export function emptyChoices() {
+  return {
+    album: '',            // 앨범 · 액자 구성
+    dressShoot: null,     // 촬영 드레스 (벌)
+    dressMain: null,      // 본식 드레스 (벌)
+    hairShoot: null,      // 촬영 헤어메이크업 (회)
+    hairMain: null,       // 본식 헤어메이크업 (회)
+    origin: 'unknown',    // 원본 데이터 구입 — yes | no | unknown
+    bouquet: 'unknown',   // 부케 — yes | no | unknown
+    services: {},         // 계약서 '서비스' 체크박스
+  };
+}
+
+// 계약서의 서비스 체크박스
+export const SDM_SERVICES = [
+  '허니문', '한복', '스킨케어', '가전 · 가구', '예복', '예물', '정장', '기타',
 ];
+
+// 몇 가지를 정했는지 — 다섯 갈래로 센다
+export function choiceCount(c) {
+  const done = [
+    Boolean(c?.album),
+    c?.dressShoot !== null && c?.dressShoot !== undefined
+      && c?.dressMain !== null && c?.dressMain !== undefined,
+    c?.hairShoot !== null && c?.hairShoot !== undefined
+      && c?.hairMain !== null && c?.hairMain !== undefined,
+    c?.origin === 'yes' || c?.origin === 'no',
+    c?.bouquet === 'yes' || c?.bouquet === 'no',
+  ];
+  return { done: done.filter(Boolean).length, total: done.length };
+}
 
 // 계약서에 인쇄된 '별도' 항목. 계약 금액에 포함되지 않는다.
 // 앱이 금액을 제시하지 않는다 — 업체에서 받은 금액을 직접 적는다.
@@ -439,7 +487,7 @@ export const SDM_PENALTY_DAYS = 90;  // 촬영일 기준 90일 이내 변경·�
 // 실제 예상 = 패키지 금액 + 적어둔 별도 비용.
 // 자료의 요지가 "계약 총액만 보면 실제 지출을 알 수 없다"는 것이다.
 export function sdmTotal(v) {
-  const p = v?.packagePrice;
+  const p = v?.quotePrice;
   const hasPackage = !(p === null || p === '' || p === undefined);
   let sum = hasPackage ? Number(p) : 0;
   let missing = hasPackage ? 0 : 1;

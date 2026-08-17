@@ -299,7 +299,7 @@ h1.ob-q { font-size: 24px; line-height: 1.42; margin: 40px 0 0; letter-spacing: 
 
 /* 힌트가 붙는 줄 — 값이 옆에 오므로 위쪽 정렬 */
 .row.withhint { align-items: flex-start; }
-.row.withhint .k { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.row.withhint .k { flex: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .row.withhint .k b { font-size: 13.5px; font-weight: 600; }
 .row.withhint .k em { font-style: normal; font-size: 11px; color: var(--mute); line-height: 1.5; }
 .row.withhint .seg { flex: none; }
@@ -314,3 +314,30 @@ h1.ob-q { font-size: 24px; line-height: 1.42; margin: 40px 0 0; letter-spacing: 
 }
 .venue .sum em { font-style: normal; font-weight: 400; font-size: 11px; color: var(--mute); }
 .chip.on { background: var(--rose-bg); color: var(--rose); }
+
+/* 두 칸 짝 입력 — 촬영 / 본식. 좁은 폭에서 눌리지 않게 라벨 아래로 쌓는다 */
+.row.pairrow { display: block; }
+.row.pairrow .pair { margin-top: 10px; }
+.pair { display: flex; gap: 8px; flex: none; }
+.pairbox {
+  display: flex; align-items: baseline; gap: 4px;
+  background: var(--field); border: 1px solid var(--line); border-radius: 10px;
+  padding: 6px 9px;
+}
+.pairbox em { font-style: normal; font-size: 10.5px; color: var(--mute); }
+.pairbox input {
+  width: 2.2em; border: 0; background: transparent; text-align: center;
+  font: inherit; font-size: 13.5px; font-weight: 700; color: var(--ink); padding: 0;
+}
+.pairbox input:focus { outline: none; }
+
+/* 다중 선택 태그 — 계약서 서비스 체크 */
+.tags { display: flex; flex-wrap: wrap; gap: 7px; }
+.tags button {
+  border: 1px solid var(--line); background: var(--field); color: var(--mute);
+  font: inherit; font-size: 12px; padding: 7px 12px; border-radius: 999px; cursor: pointer;
+}
+.tags button[aria-pressed='true'] {
+  background: var(--rose-bg); border-color: #f0dcd8; color: var(--rose); font-weight: 600;
+}
+.row.withhint input[type='text'] { flex: none; width: 46%; }
