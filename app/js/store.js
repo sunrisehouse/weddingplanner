@@ -5,16 +5,31 @@
 
 const KEY = 'weddingplanner.v1';
 
+// 자료(체크리스트)의 `구분` 열이 그대로 온보딩 질문이 된다.
+// 준비 상태는 세 항목 모두 같은 값을 쓴다: done | looking | none
 const emptyProfile = () => ({
   ceremonyDateStatus: null,   // confirmed | tentative | unknown
   ceremonyDate: '',
-  venueStatus: null,          // contracted | touring | none
-  guestEstimate: null,        // 숫자 또는 null(모름)
-  pyebaek: null,              // yes | no | unknown
+  venueStatus: null,          // 웨딩홀
+  sdmStatus: null,            // 스드메 (웨딩패키지)
+  honeymoonStatus: null,      // 허니문
+  honsuStatus: null,          // 혼수
   onboardedAt: null,
 });
 
+// 이전 버전의 웨딩홀 값 이름을 맞춘다
+const LEGACY = { contracted: 'done', touring: 'looking' };
+
 const empty = () => ({ version: 1, venues: [], profile: emptyProfile(), updatedAt: null });
+
+// 안 쓰는 질문의 답은 들고 다니지 않는다
+function migrate(profile) {
+  const p = { ...profile };
+  if (LEGACY[p.venueStatus]) p.venueStatus = LEGACY[p.venueStatus];
+  delete p.guestEstimate;
+  delete p.pyebaek;
+  return p;
+}
 
 function read() {
   try {
@@ -22,7 +37,7 @@ function read() {
     if (!raw) return empty();
     const data = JSON.parse(raw);
     if (data?.version !== 1 || !Array.isArray(data.venues)) return empty();
-    data.profile = { ...emptyProfile(), ...(data.profile ?? {}) };
+    data.profile = migrate({ ...emptyProfile(), ...(data.profile ?? {}) });
     return data;
   } catch {
     return empty();
@@ -133,7 +148,7 @@ export const store = {
     if (data?.version !== 1 || !Array.isArray(data.venues)) {
       throw new Error('이 파일은 웨딩플래너 백업 파일이 아닌 것 같아요.');
     }
-    data.profile = { ...emptyProfile(), ...(data.profile ?? {}) };
+    data.profile = migrate({ ...emptyProfile(), ...(data.profile ?? {}) });
     state = data;
     commit();
   },
@@ -158,5 +173,45 @@ export function daysToCeremony(profile) {
   return Math.round((d - today) / 86400000);
 }
 
-// 자료 기준: 웨딩홀은 최소 10개월 전 예약
-export const VENUE_LEAD_DAYS = 300;
+// 자료의 큰 항목(체크리스트 `구분` 열)과 거기 적힌 예약 시점.
+// 숫자는 전부 자료의 `비고` 열에서 왔다. 앱이 만든 기준이 아니다.
+// days = 예식일까지 남은 일수 기준 (한 달 30일로 계산)
+export const PREP = [
+  {
+    key: 'venueStatus', label: '웨딩홀', days: 300,
+    note: '최소 10개월 전 예약',
+    items: '예식장 사용료 · 꽃장식 · 피로연 · 본식 스냅',
+  },
+  {
+    key: 'sdmStatus', label: '스드메', days: 300,
+    note: '10~12개월 전 예약',
+    items: '스튜디오 · 드레스 · 헤어메이크업 · 부케',
+  },
+  {
+    key: 'honeymoonStatus', label: '허니문', days: 180,
+    note: '6~8개월 전',
+    items: '신혼여행비 · 예비비',
+  },
+  {
+    key: 'honsuStatus', label: '혼수', days: 90,
+    note: '예단 3개월 전',
+    items: '한복 · 웨딩반지 · 예복 · 예단 · 가전/가구',
+    caveat: '한복은 촬영 2개월 전, 가전·가구는 입주 2~3개월 전 기준이에요',
+  },
+];
+
+// 본인이 답한 상태와 자료의 시점을 맞춰본다.
+// 앱이 순서를 정해주는 게 아니라, 자료에 적힌 시점이 지났는지만 알린다.
+export function prepStatus(profile) {
+  const d = daysToCeremony(profile);
+  return PREP.map((c) => {
+    const answer = profile?.[c.key] ?? null;
+    let state;
+    if (answer === 'done') state = 'done';
+    else if (answer === null) state = 'unanswered';   // 안 물어봤거나 건너뛴 것
+    else if (d === null) state = 'nodate';            // 예식일을 모르면 시점을 못 따진다
+    else if (d < c.days) state = 'late';
+    else state = 'ok';
+    return { ...c, answer, state, d };
+  });
+}

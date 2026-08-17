@@ -1,4 +1,4 @@
-import { store, blankVenue, total, daysToCeremony, VENUE_LEAD_DAYS } from './store.js';
+import { store, blankVenue, total, daysToCeremony, prepStatus } from './store.js';
 import { photos } from './photos.js';
 
 const $ = (sel, el = document) => el.querySelector(sel);
@@ -31,13 +31,14 @@ const brand = (sub = '') => `
 
 
 // ── 온보딩 — 한 화면에 질문 하나 ────────────────────────────────────────
-// 답을 실제로 쓰는 질문만 넣는다. 물어놓고 아무것도 안 하면
-// 안 물어본 것보다 나쁘다.
+// 자료(체크리스트)의 `구분` 열에 있는 큰 항목만 묻는다.
+// 청첩장 · DVD · 폐백음식처럼 자료에서 '기타'로 묶인 작은 항목은 묻지 않는다.
+// 답은 자료의 `비고` 열에 적힌 예약 시점과 맞춰보는 데 쓴다.
 const QUESTIONS = [
   {
     key: 'ceremonyDateStatus',
     title: '결혼식 날짜가\n정해지셨나요?',
-    sub: '예약을 서둘러야 하는지 알려드릴게요',
+    sub: '자료에 적힌 예약 시점과 맞춰볼 기준이 돼요',
     options: [
       { v: 'confirmed', l: '네, 확정했어요', next: 'date' },
       { v: 'tentative', l: '가예약만 해뒀어요', next: 'date' },
@@ -46,33 +47,42 @@ const QUESTIONS = [
   },
   {
     key: 'venueStatus',
-    title: '결혼식장은\n정하셨나요?',
-    sub: '',
+    title: '웨딩홀은\n정하셨나요?',
+    sub: '예식장 사용료 · 꽃장식 · 피로연 · 본식 스냅',
     options: [
-      { v: 'contracted', l: '계약까지 했어요' },
-      { v: 'touring', l: '투어 다니는 중이에요' },
+      { v: 'done', l: '계약했어요' },
+      { v: 'looking', l: '투어 다니는 중이에요' },
       { v: 'none', l: '아직 안 알아봤어요' },
     ],
   },
   {
-    key: 'guestEstimate',
-    title: '하객은 몇 명쯤\n예상하세요?',
-    sub: '보증인원을 적을 때 기본값으로 넣어둘게요',
+    key: 'sdmStatus',
+    title: '스드메는\n어디까지 하셨나요?',
+    sub: '스튜디오 · 드레스 · 헤어메이크업 · 부케',
     options: [
-      { v: 100, l: '100명 안팎' },
-      { v: 200, l: '200명 안팎' },
-      { v: 300, l: '300명 이상' },
-      { v: null, l: '아직 모르겠어요' },
+      { v: 'done', l: '계약했어요' },
+      { v: 'looking', l: '상담 받는 중이에요' },
+      { v: 'none', l: '아직 안 알아봤어요' },
     ],
   },
   {
-    key: 'pyebaek',
-    title: '폐백을\n하시나요?',
-    sub: '폐백실 없는 홀을 표시해드릴게요',
+    key: 'honeymoonStatus',
+    title: '허니문은\n정하셨나요?',
+    sub: '신혼여행지 · 예비비',
     options: [
-      { v: 'yes', l: '할 거예요' },
-      { v: 'no', l: '안 할래요' },
-      { v: 'unknown', l: '아직 모르겠어요' },
+      { v: 'done', l: '예약했어요' },
+      { v: 'looking', l: '알아보는 중이에요' },
+      { v: 'none', l: '아직 안 알아봤어요' },
+    ],
+  },
+  {
+    key: 'honsuStatus',
+    title: '혼수는\n어디까지 하셨나요?',
+    sub: '한복 · 웨딩반지 · 예복 · 예단 · 가전/가구',
+    options: [
+      { v: 'done', l: '거의 정했어요' },
+      { v: 'looking', l: '알아보는 중이에요' },
+      { v: 'none', l: '아직 안 알아봤어요' },
     ],
   },
 ];
@@ -147,34 +157,49 @@ function dateView(i) {
   $('#later').onclick = go;
 }
 
+const STATE_TXT = {
+  done: ['했어요', 'ok'],
+  late: ['시점 지났어요', 'late'],
+  ok: ['아직 여유 있어요', 'ok'],
+  nodate: ['예식일 정하면 알려드려요', 'mute'],
+  unanswered: ['안 답하셨어요', 'mute'],
+};
+
 function doneView() {
   const p = store.profile();
   store.finishOnboarding();
   const d = daysToCeremony(p);
+  const prep = prepStatus(p);
+  const late = prep.filter((c) => c.state === 'late');
 
-  const lines = [];
-  if (d !== null) {
-    lines.push(`<div class="row do"><span class="k">결혼식까지</span><span class="v">D-${d}</span></div>`);
-  }
-  if (p.guestEstimate) {
-    lines.push(`<div class="row do"><span class="k">보증인원 기본값</span><span class="v">${p.guestEstimate}명</span></div>`);
-  }
-  if (p.pyebaek === 'yes') {
-    lines.push(`<div class="row do"><span class="k">폐백실 없는 홀</span><span class="v">표시해드려요</span></div>`);
-  }
+  const dline = d === null
+    ? ''
+    : `<div class="row do"><span class="k">결혼식까지</span><span class="v">D-${d}</span></div>`;
 
-  // 자료 기준 판단 — 최소 10개월 전 예약
-  let lead = '';
-  if (d !== null && p.venueStatus !== 'contracted') {
-    lead = d < VENUE_LEAD_DAYS
-      ? `<div class="card notice"><p><b>웨딩홀부터 서둘러 알아보세요.</b></p>
-         <p>자료 기준 웨딩홀은 최소 10개월 전 예약이에요.
-            지금 ${Math.floor(d / 30)}개월 남았습니다.</p></div>`
-      : `<div class="card notice ok"><p><b>웨딩홀 알아보기 좋은 시기예요.</b></p>
-         <p>자료 기준 최소 10개월 전 예약이고, 지금 ${Math.floor(d / 30)}개월 남았습니다.</p></div>`;
-  }
+  const rows = prep
+    .map((c) => {
+      const [txt, cls] = STATE_TXT[c.state];
+      return `<div class="row prep ${cls}">
+        <span class="k"><b>${c.label}</b><em>자료 기준 ${esc(c.note)}</em></span>
+        <span class="st">${txt}</span>
+      </div>`;
+    })
+    .join('');
 
-  const cta = p.venueStatus === 'none'
+  // 자료에 적힌 시점이 지난 항목만 짚는다. 무엇을 먼저 하라고 정해주지는 않는다.
+  const lead = late.length
+    ? `<div class="card notice">
+         <p><b>${late.map((c) => esc(c.label)).join(' · ')}</b> — 자료 기준 예약 시점이 지났어요.</p>
+         <p>${late.map((c) => `${esc(c.label)} ${esc(c.note)}`).join(' / ')}.
+            지금 ${Math.floor(d / 30)}개월 남았습니다.</p>
+       </div>`
+    : d === null
+      ? `<div class="card notice"><p><b>예식일을 정하면 시점을 맞춰볼 수 있어요.</b></p>
+         <p>자료의 예약 시점은 전부 예식일 기준이에요.</p></div>`
+      : '';
+
+  const caveats = prep.filter((c) => c.caveat && c.state !== 'done');
+  const cta = p.venueStatus === 'none' || p.venueStatus === null
     ? { hash: '#/guide', label: '투어에서 물어볼 것 보기' }
     : { hash: '#/new', label: '웨딩홀 기록 시작하기' };
 
@@ -182,8 +207,15 @@ function doneView() {
     ${brand()}
     <h1 class="hero">준비됐어요</h1>
     <p class="hero-sub">답해주신 내용은 언제든 바꿀 수 있어요.</p>
-    ${lines.length ? `<div class="card">${lines.join('')}</div>` : ''}
+    <div class="card">${dline}${rows}</div>
     ${lead}
+    ${caveats.length
+      ? `<p class="note">${caveats.map((c) => esc(c.caveat)).join('<br />')}</p>`
+      : ''}
+    <p class="note">
+      시점은 전부 <b>박람회 자료에 인쇄된 값</b>이에요.
+      앱이 업체나 금액을 제안하지는 않아요.
+    </p>
     <div class="sticky">
       <button class="btn btn-primary" id="go">${cta.label}</button>
       <button class="linkish ob-skip" id="home">둘러보기</button>
@@ -308,14 +340,16 @@ function listView() {
 
   const p = store.profile();
   const d = daysToCeremony(p);
+  const late = prepStatus(p).filter((c) => c.state === 'late');
   const dday = d === null ? '' : `
     <div class="dday">
       <span class="n">D-${d}</span>
       <span class="t">${esc(dateLabel(p.ceremonyDate))}${
         p.ceremonyDateStatus === 'tentative' ? ' · 가예약' : ''
       }</span>
-      ${d < VENUE_LEAD_DAYS && p.venueStatus !== 'contracted'
-        ? '<span class="warn">자료 기준 웨딩홀은 10개월 전 예약</span>' : ''}
+      ${late.length
+        ? `<span class="warn">자료 기준 시점 지남 · ${late.map((c) => esc(c.label)).join(' · ')}</span>`
+        : ''}
     </div>`;
 
   app.innerHTML = `
@@ -348,7 +382,7 @@ function listView() {
     <button class="btn btn-ghost" id="add" style="margin-top:14px">＋ 웨딩홀 기록하기</button>
 
     ${venues.length >= 2
-      ? compareTable(venues) + pyebaekWarning(venues)
+      ? compareTable(venues)
       : `<p class="note">한 곳 더 기록하면 <b>비교표</b>가 나타납니다.</p>`}
 
     <div class="btn-row">
@@ -379,17 +413,6 @@ function listView() {
       if (confirm('예시 데이터를 지울까요?')) { store.clearSample(); render(); }
     };
   }
-}
-
-// 앱이 판단하지 않는다. 본인이 답한 것과 적어둔 것이 어긋나는 지점만 알린다.
-function pyebaekWarning(venues) {
-  if (store.profile().pyebaek !== 'yes') return '';
-  const bad = venues.filter((v) => v.pyebaekRoom === 'no');
-  if (!bad.length) return '';
-  return `<div class="card notice">
-    <p><b>${bad.map((v) => esc(v.name || '이름 없는 홀')).join(' · ')}</b>에는 폐백실이 없어요.</p>
-    <p>폐백을 하기로 답하셨어요. 어느 쪽을 고르실지는 직접 판단하세요.</p>
-  </div>`;
 }
 
 function compareTable(venues) {
@@ -479,9 +502,6 @@ function editView(id) {
       ${moneyRow('꽃장식', 'flowers')}
       ${moneyRow('식대 (1인)', 'mealPrice')}
       ${moneyRow('보증인원', 'guarantee', '명')}
-      ${store.profile().guestEstimate && (v.guarantee === null || v.guarantee === '')
-        ? `<div class="row hintrow"><span class="k">예상 하객 ${store.profile().guestEstimate}명으로 답하셨어요</span>
-             <button class="linkish" id="use-guest">${store.profile().guestEstimate} 넣기</button></div>` : ''}
       <div class="row total"><span class="k"><b>예상 합계</b></span><span class="v" id="total"></span></div>
     </div>
     <p class="formula">홀 사용료 + 꽃장식 + (보증인원 × 식대) · 보증인원은 2~3주 전 최종 결정</p>
@@ -527,15 +547,6 @@ function editView(id) {
   };
 
   const persist = () => { store.save(v); };
-
-  const useGuest = $('#use-guest');
-  if (useGuest) {
-    useGuest.onclick = () => {
-      v.guarantee = store.profile().guestEstimate;
-      persist();
-      editView(v.id);   // 다시 그려서 입력칸에 반영
-    };
-  }
 
   app.querySelectorAll('[data-k]').forEach((el) => {
     el.oninput = () => {

@@ -245,5 +245,14 @@ h1.ob-q { font-size: 24px; line-height: 1.42; margin: 40px 0 0; letter-spacing: 
   background: var(--rose-bg); border-radius: 8px; padding: 6px 9px; margin-top: 4px;
 }
 
-.row.hintrow { background: var(--field); }
-.row.hintrow .k { font-size: 11.5px; color: var(--mute); }
+/* 준비 시점 요약 — 자료 기준과 본인 답을 한 줄에 놓는다 */
+.row.prep { align-items: flex-start; gap: 10px; }
+.row.prep .k { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.row.prep .k b { font-size: 13.5px; font-weight: 600; }
+.row.prep .k em { font-size: 11px; color: var(--mute); font-style: normal; }
+.row.prep .st {
+  flex: none; font-size: 11px; padding: 4px 8px; border-radius: 999px;
+  background: var(--field); color: var(--mute); white-space: nowrap;
+}
+.row.prep.ok .st { background: #eef3ee; color: var(--green); }
+.row.prep.late .st { background: var(--rose-bg); color: var(--rose); }
