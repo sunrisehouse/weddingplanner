@@ -503,11 +503,6 @@ function homeView() {
       <span class="hint">눌러서 관리하기</span>
     </h2>
     <div class="card">${rows}</div>
-    ${late.length || next
-      ? `<p class="note">${anchor.kind === 'month'
-          ? '예상 시기에서 거꾸로 세어드린 달이에요. 날짜가 정해지면 날짜로 바뀝니다.'
-          : '마감일은 예식일에서 거꾸로 세어드린 날짜예요.'}</p>`
-      : ''}
 
     <div class="btn-row">
       <button class="btn btn-quiet" id="export">내보내기</button>
@@ -515,10 +510,7 @@ function homeView() {
     </div>
     <input type="file" id="file" accept="application/json" hidden />
 
-    <p class="note">
-      기록은 <b>이 브라우저에만</b> 저장돼요. 다른 기기나 상대방 폰에서는 보이지 않아요.
-      옮기실 때는 내보내기를 쓰세요.
-    </p>
+    <p class="note">기록은 <b>이 브라우저에만</b> 저장돼요. 옮기실 때는 내보내기를 쓰세요.</p>
     ${tabBar('home')}
   `;
   const setdate = $('#setdate');
@@ -542,21 +534,17 @@ function choiceCard() {
 
   // 품목 머리줄 — 무엇의 조건인지 한 줄로 갈라준다
   const head = (key) => {
-    const [, label, hint] = SDM_PARTS.find(([k]) => k === key);
-    const extras = extrasOf(key);
-    return `<div class="row grouphead">
-      <span class="gk">${label}</span>
-      <span class="gh">${esc(hint)}${
-        extras.length ? ` · 별도 ${extras.map((x) => x.label).join(' · ')}` : ''
-      }</span>
-    </div>`;
+    const [, label] = SDM_PARTS.find(([k]) => k === key);
+    return `<div class="row grouphead"><span class="gk">${label}</span></div>`;
   };
 
   const yn = (key, label, hint) => `
-    <div class="row withhint">
-      <span class="k"><b>${label}</b>${hint ? `<em>${esc(hint)}</em>` : ''}</span>
+    <div class="row optrow${hint ? ' withhint' : ''}">
+      ${hint
+        ? `<span class="k"><b>${label}</b><em>${esc(hint)}</em></span>`
+        : `<span class="k">${label}</span>`}
       <span class="seg" data-choice3="${key}">
-        ${[['yes', '할게요'], ['no', '안 할래요'], ['unknown', '미정']].map(([v, l]) =>
+        ${[['yes', '할게요'], ['no', '안 함'], ['unknown', '미정']].map(([v, l]) =>
           `<button type="button" data-v="${v}" aria-pressed="${(c[key] ?? 'unknown') === v}">${l}</button>`
         ).join('')}
       </span>
@@ -582,29 +570,24 @@ function choiceCard() {
     </h2>
     <div class="card">
       ${head('studio')}
-      <div class="row withhint">
-        <span class="k"><b>앨범 · 액자</b><em>계약서엔 20p 앨범 · 기본 액자로 인쇄돼 있어요.
-          세미 액자로 하면 구성이 달라져요</em></span>
-        <input type="text" data-choice-text="album" value="${esc(c.album)}"
-               placeholder="예: 20p 1권 + 20R 액자" />
+      <div class="row">
+        <label for="ch-album">앨범 · 액자</label>
+        <input id="ch-album" type="text" data-choice-text="album" value="${esc(c.album)}"
+               placeholder="20p 1권 + 20R 액자" />
       </div>
-      ${yn('origin', '원본 데이터', '계약 금액 밖이라 따로 사야 해요')}
+      ${yn('origin', '원본 데이터', '별도 구입')}
 
       ${head('dress')}
-      ${pair('벌수', '자료엔 촬영 3벌 / 본식 1벌. 신랑 예복은 별도예요',
+      ${pair('벌수', '촬영 3벌 · 본식 1벌이 기본',
         ['dressShoot', '촬영', '벌'], ['dressMain', '본식', '벌'])}
 
       ${head('makeup')}
-      ${pair('횟수', '신랑 · 신부 각각이에요. 자료엔 촬영 1회 / 본식 1회',
+      ${pair('횟수', '신랑 · 신부 각각 1회가 기본',
         ['hairShoot', '촬영', '회'], ['hairMain', '본식', '회'])}
 
       ${head('bouquet')}
-      ${yn('bouquet', '부케', '')}
+      ${yn('bouquet', '부케', '부토니아 · 코사지 포함')}
     </div>
-    <p class="formula">
-      정해두시면 업체마다 같은 조건으로 견적을 받을 수 있어요.
-      ${n.done < n.total ? `아직 ${n.total - n.done}개 남았어요.` : ''}
-    </p>
 
     <h2 class="section-title">받을 서비스
       <span class="hint">${picked.length ? picked.join(' · ') : '계약서 체크 항목'}</span>
@@ -618,7 +601,26 @@ function choiceCard() {
           ).join('')}
         </div>
       </div>
-    </div>`;
+    </div>
+
+    ${extrasDetails()}`;
+}
+
+// 계약 금액 밖 항목 — 읽을 거리라 접어둔다. 필요할 때만 펼친다.
+function extrasDetails() {
+  return `
+    <details class="more">
+      <summary>계약 금액 밖 ${SDM_EXTRAS.length}개 — 상담에서 물어보세요</summary>
+      <div class="card">
+        ${SDM_PARTS.filter(([k]) => extrasOf(k).length).map(([k, label]) => `
+          <div class="row grouphead"><span class="gk">${label}</span></div>
+          ${extrasOf(k).map(({ label: l, hint }) => `
+            <div class="row tight">
+              <span class="k">${l}</span>
+              ${hint ? `<span class="v mute">${esc(hint)}</span>` : ''}
+            </div>`).join('')}`).join('')}
+      </div>
+    </details>`;
 }
 
 function bindChoices() {
@@ -674,22 +676,6 @@ function sdmIntro(head) {
 
     ${choiceCard()}
 
-    <h2 class="section-title">상담에서 꼭 물어볼 것
-      <span class="hint">계약 금액 밖 ${SDM_EXTRAS.length}개</span>
-    </h2>
-    <div class="card">
-      ${SDM_PARTS.filter(([k]) => extrasOf(k).length).map(([k, label]) => `
-        <div class="row grouphead"><span class="gk">${label}</span></div>
-        ${extrasOf(k).map(({ label: l, hint }) => `
-          <div class="row withhint">
-            <span class="k"><b>${l}</b>${hint ? `<em>${esc(hint)}</em>` : ''}</span>
-          </div>`).join('')}`).join('')}
-    </div>
-    <p class="note">
-      계약 총액만 보면 실제 지출을 알 수 없어요. <b>이 ${SDM_EXTRAS.length}개를 다 물어봐야</b>
-      업체끼리 제대로 비교됩니다.
-    </p>
-
     <div class="sticky">
       <button class="btn btn-primary" id="add">업체 기록 시작하기</button>
     </div>
@@ -718,10 +704,8 @@ function sdmCompare(head, list) {
       ? sdmTable(list)
       : '<p class="note">한 곳 더 적으면 <b>비교표</b>가 나타납니다.</p>'}
 
-    <p class="note">
-      <b>실제 예상</b>은 받은 견적에 적어두신 별도 비용을 더한 값이에요.
-      적어두신 것만 더하고, 시세나 평균가는 알려드리지 않아요.
-    </p>
+    <p class="note"><b>실제 예상</b> = 받은 견적 + 적어둔 별도 비용</p>
+    ${extrasDetails()}
     ${tabBar('sdm')}
   `;
   $('#add').onclick = () => (location.hash = '#/sdm/new');
@@ -784,22 +768,24 @@ function sdmContracted(head, p, picked, list) {
       ${SDM_STEPS.map(([k, label, hint]) => dateRow(k, label, s[k], hint)).join('')}
     </div>
 
-    <h2 class="section-title">계약 금액 밖의 항목</h2>
-    <div class="card">
-      ${SDM_PARTS.filter(([k]) => extrasOf(k).length).map(([k, label]) => `
-        <div class="row grouphead"><span class="gk">${label}</span></div>
-        ${extrasOf(k).map(({ key, label: l }) => {
-          const x = picked.extras?.[key];
-          const has = !(x === null || x === '' || x === undefined);
-          return `<div class="row">
-            <span class="k">${l}</span>
-            <span class="v${has ? '' : ' none'}">${has ? won(x) + '원' : '미입력'}</span>
-          </div>`;
-        }).join('')}`).join('')}
-    </div>
-    <p class="note">
-      금액을 고치시려면 <button class="linkish" data-go-sdm="${picked.id}">계약 내용</button>에서 적어주세요.
-    </p>
+    <details class="more">
+      <summary>계약 금액 밖 ${SDM_EXTRAS.length}개 — 적어둔 금액</summary>
+      <div class="card">
+        ${SDM_PARTS.filter(([k]) => extrasOf(k).length).map(([k, label]) => `
+          <div class="row grouphead"><span class="gk">${label}</span></div>
+          ${extrasOf(k).map(({ key, label: l }) => {
+            const x = picked.extras?.[key];
+            const has = !(x === null || x === '' || x === undefined);
+            return `<div class="row tight">
+              <span class="k">${l}</span>
+              <span class="v${has ? '' : ' none'}">${has ? won(x) + '원' : '미입력'}</span>
+            </div>`;
+          }).join('')}`).join('')}
+      </div>
+      <p class="note">
+        <button class="linkish" data-go-sdm="${picked.id}">계약 내용</button>에서 고칠 수 있어요.
+      </p>
+    </details>
 
     ${others.length ? `
       <h2 class="section-title">비교했던 곳
@@ -961,9 +947,10 @@ function sdmEdit(id) {
              value="${v[key] ?? ''}" placeholder="미입력" />
     </div>`;
 
-  const extraRow = ({ key, label, hint }) => `
-    <div class="row withhint">
-      <span class="k"><b>${label}</b><em>별도${hint ? ' · ' + esc(hint) : ''}</em></span>
+  // 별도 항목 — 라벨만. 설명은 '정할 것' 화면에 접어둔 목록에 한 번 있다.
+  const extraRow = ({ key, label }) => `
+    <div class="row">
+      <label for="x-${key}">${label} <span class="tag">별도</span></label>
       <input id="x-${key}" type="number" inputmode="numeric" data-extra="${key}"
              value="${v.extras?.[key] ?? ''}" placeholder="미입력" />
     </div>`;
@@ -987,7 +974,7 @@ function sdmEdit(id) {
 
     <h2 class="section-title">받은 견적 <span class="hint">정하신 조건으로</span></h2>
     <div class="card">
-      ${money('quotePrice', '견적 금액', '정하신 조건으로 받은 금액')}
+      ${money('quotePrice', '견적 금액')}
     </div>
 
     <h2 class="section-title">품목별 <span class="hint">업체가 주는 구성</span></h2>
@@ -1028,7 +1015,7 @@ function sdmEdit(id) {
         <span class="v" id="sdm-total"></span>
       </div>
     </div>
-    <p class="formula">견적 금액 + 적어두신 별도 비용 · 모르는 항목은 비워두세요</p>
+    <p class="formula">모르는 항목은 비워두세요</p>
 
     <h2 class="section-title">메모</h2>
     <div class="card">
@@ -1172,7 +1159,7 @@ function honeymoonView() {
       </div>
     </div>
     ${missing && missing < HONEYMOON_COSTS.length
-      ? `<p class="formula">아직 안 적은 항목이 ${missing}개 있어요. 합계에는 안 들어갔어요.</p>`
+      ? `<p class="formula">안 적은 항목 ${missing}개는 합계에서 빠졌어요</p>`
       : ''}
 
     <h2 class="section-title">메모</h2>
@@ -1205,6 +1192,25 @@ function honeymoonView() {
 // 혼수도 사 오는 게 아니라 품목마다 고르는 일이다. 자료의 `내용` 열에
 // 갈래가 적혀 있어 그대로 선택지가 된다.
 // 시점 기준도 예식일이 아니다 — 한복은 촬영일, 살림은 입주일에서 나온다.
+// 품목에 무엇이 들어가는지 — 읽을 거리라 접어둔다
+function honsuDetails() {
+  return `
+    <details class="more">
+      <summary>품목에 뭐가 들어가나요</summary>
+      <div class="card">
+        ${HONSU_CHOICES.map(({ label, hint }) => `
+          <div class="row tight">
+            <span class="k">${label}</span>
+            <span class="v mute">${esc(hint)}</span>
+          </div>`).join('')}
+        <div class="row tight">
+          <span class="k">신혼집 살림</span>
+          <span class="v mute">신혼집에 맞춰 · 입주일 기준</span>
+        </div>
+      </div>
+    </details>`;
+}
+
 function honsuView() {
   const h = store.plan('honsu');
   const sdm = store.plan('sdm');
@@ -1212,9 +1218,11 @@ function honsuView() {
   const hm = homeCount(h);
   const d = honsuDates(h, sdm);
 
-  const choiceRow = ({ key, label, hint, opts }) => `
-    <div class="row withhint stack">
-      <span class="k"><b>${label}</b><em>${esc(hint)}</em></span>
+  const choiceRow = ({ key, label, short, opts }) => `
+    <div class="row optrow${short ? ' withhint' : ''}">
+      ${short
+        ? `<span class="k"><b>${label}</b><em>${esc(short)}</em></span>`
+        : `<span class="k">${label}</span>`}
       <span class="seg" data-honsu="${key}">
         ${opts.map(([v, l]) =>
           `<button type="button" data-v="${v}" aria-pressed="${(h[key] ?? 'unknown') === v}">${l}</button>`
@@ -1249,7 +1257,7 @@ function honsuView() {
       ${dateRow('moveInDate', '입주 예정일', h.moveInDate,
         d.home ? `${mdLabel(d.home)}까지 준비하세요 · 입주 2개월 전` : '입주 2~3개월 전에 준비해요')}
       ${HOME_ITEMS.map(([k, label]) => `
-        <div class="row">
+        <div class="row optrow">
           <span class="k">${label}</span>
           <span class="seg" data-home="${k}">
             ${[['yes', '준비'], ['no', '생략'], ['unknown', '미정']].map(([v, l]) =>
@@ -1258,10 +1266,7 @@ function honsuView() {
           </span>
         </div>`).join('')}
     </div>
-    <p class="note">
-      살림은 <b>신혼집에 맞춰</b> 사는 것들이라 예식일이 아니라 입주일이 기준이에요.
-      예단만 예식 3개월 전으로 챙겨드려요.
-    </p>
+    ${honsuDetails()}
   `;
 
   $('#back').onclick = () => (location.hash = '#/');
@@ -1363,10 +1368,7 @@ function guideView() {
       <div class="row ask"><span class="k"><b>위약금 기준</b><em>며칠 전부터 발생하는지</em></span></div>
     </div>
 
-    <p class="note">
-      투어 중에 다 못 물어보는 게 정상이에요. 기록할 때 <b>모름</b>으로 남겨두면
-      나중에 "안 물어본 것"과 "없는 것"이 구분됩니다.
-    </p>
+    <p class="note">다 못 물어봐도 괜찮아요. 기록할 때 <b>모름</b>으로 남기시면 돼요.</p>
 
     <div class="sticky">
       <button class="btn btn-primary" id="record">투어 기록하기</button>
@@ -1450,10 +1452,7 @@ function venueListView() {
       ? compareTable(venues)
       : `<p class="note">한 곳 더 기록하면 <b>비교표</b>가 나타납니다.</p>`}
 
-    <p class="note">
-      적어두신 것을 나란히 놓아드릴 뿐이에요. 순위를 매기거나 추천하지 않아요.<br />
-      <button class="linkish" id="guide">투어 준비 다시 보기</button>
-    </p>
+    <p class="note"><button class="linkish" id="guide">투어에서 확인할 것 보기</button></p>
     ${tabBar('venue')}
   `;
 

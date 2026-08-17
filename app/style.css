@@ -364,3 +364,33 @@ table.compare tr.grp th {
   border-top: 1px solid var(--line); position: static;
 }
 table.compare td.wrap { white-space: normal; min-width: 110px; font-size: 11.5px; }
+
+/* 접어두는 설명 — 결정 화면에 읽을 거리를 쌓지 않는다 */
+details.more { margin-top: 12px; }
+details.more > summary {
+  list-style: none; cursor: pointer;
+  color: var(--rose); font-size: 11.5px; padding: 6px 2px;
+}
+details.more > summary::-webkit-details-marker { display: none; }
+details.more > summary::after { content: ' ⌄'; }
+details.more[open] > summary::after { content: ' ⌃'; }
+details.more .card { margin-top: 6px; }
+details.more .note { margin-top: 8px; }
+
+/* 읽기용 줄 — 입력이 없으니 낮게 */
+.row.tight { min-height: 0; padding: 9px 18px; }
+.row.tight .k { font-size: 12.5px; }
+.row .v.mute { color: var(--mute); font-weight: 400; font-size: 11px; }
+.tag {
+  display: inline-block; background: var(--field); color: var(--mute);
+  border: 1px solid var(--line); border-radius: 6px;
+  padding: 1px 5px; font-size: 10px; font-weight: 600; margin-left: 4px;
+}
+
+/* 좁은 폭(320px대)에서는 선택 버튼이 라벨을 눌러 글자를 쪼갠다.
+   그때만 버튼을 라벨 아래로 내린다. */
+@media (max-width: 359px) {
+  .row.optrow { display: block; }
+  .row.optrow .seg { display: flex; margin-top: 9px; }
+  .row.optrow .seg button { flex: 1; padding: 6px 3px; }
+}

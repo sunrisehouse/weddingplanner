@@ -586,34 +586,34 @@ export function honeymoonTotal(h) {
 //    시세를 제시하는 셈이 되기 때문이다. 금액은 직접 적는다.
 export const HONSU_CHOICES = [
   {
-    key: 'hanbokBride', label: '한복 (신부)',
+    key: 'hanbokBride', label: '한복 (신부)', short: '',
     hint: '치마 · 저고리 / 배자 · 두루마기 / 당의',
-    opts: [['custom', '맞춤'], ['rent', '대여'], ['skip', '안 할래요']],
+    opts: [['custom', '맞춤'], ['rent', '대여'], ['skip', '안 함']],
   },
   {
-    key: 'hanbokGroom', label: '한복 (신랑)',
+    key: 'hanbokGroom', label: '한복 (신랑)', short: '',
     hint: '바지 · 저고리 · 조끼 · 마고자 / 두루마기 · 배자 / 쾌자',
-    opts: [['custom', '맞춤'], ['rent', '대여'], ['skip', '안 할래요']],
+    opts: [['custom', '맞춤'], ['rent', '대여'], ['skip', '안 함']],
   },
   {
-    key: 'hanbokMother', label: '한복 (양가 어머님)',
+    key: 'hanbokMother', label: '한복 (양가 어머님)', short: '',
     hint: '치마 · 저고리',
-    opts: [['custom', '맞춤'], ['rent', '대여'], ['skip', '안 할래요']],
+    opts: [['custom', '맞춤'], ['rent', '대여'], ['skip', '안 함']],
   },
   {
-    key: 'ring', label: '웨딩반지',
+    key: 'ring', label: '웨딩반지', short: '예물 = 다이아 · 진주 · 시계 등',
     hint: '예물까지 하면 신부 다이아 · 진주 · 패션 set · 금가락지, 신랑 시계',
-    opts: [['couple', '커플링'], ['couplePlus', '예물까지'], ['skip', '안 할래요']],
+    opts: [['couple', '커플링'], ['couplePlus', '예물'], ['skip', '안 함']],
   },
   {
-    key: 'suit', label: '예복',
+    key: 'suit', label: '예복', short: '신랑',
     hint: '신랑 맞춤예복 / 턱시도 대여 서비스',
-    opts: [['custom', '맞춤'], ['rent', '대여'], ['skip', '안 할래요']],
+    opts: [['custom', '맞춤'], ['rent', '대여'], ['skip', '안 함']],
   },
   {
-    key: 'yedan', label: '예단',
+    key: 'yedan', label: '예단', short: '예물 = 이불 · 반상기 · 은수저 등',
     hint: '예물까지 하면 이불 · 침구 · 반상기 · 은수저 등',
-    opts: [['cash', '현금'], ['cashGift', '현금+예물'], ['skip', '안 할래요']],
+    opts: [['cash', '현금'], ['cashGift', '+예물'], ['skip', '안 함']],
   },
 ];
 
