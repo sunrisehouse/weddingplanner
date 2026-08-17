@@ -55,6 +55,8 @@ h1 { font-size: 22px; margin: 0; letter-spacing: -0.01em; }
   margin: 26px 0 10px; display: flex; justify-content: space-between; align-items: baseline;
 }
 .section-title .hint { font-weight: 400; font-size: 11px; color: var(--mute); }
+/* 섹션 제목 없이 카드가 이어질 때의 간격 */
+.gap { margin-top: 12px; }
 
 /* ── 리스트 행 ────────────────────────────────────── */
 .row {
@@ -182,9 +184,6 @@ h1.hero.sm { font-size: 21px; margin-top: 6px; }
 
 .row.do { justify-content: space-between; }
 .row.do .k { font-size: 12.5px; }
-.mark { font-size: 13px; font-weight: 700; }
-.mark.yes { color: var(--green); }
-.mark.no { color: #c9bfb6; }
 
 .row.ask { display: block; }
 .row.ask .k { display: flex; flex-direction: column; gap: 4px; }

@@ -197,13 +197,13 @@ function doneView() {
 
   // 시점이 지난 것만 짚는다. 무엇을 먼저 하라고 순서를 정해주지는 않는다.
   const lead = late.length
-    ? `<div class="card notice">
+    ? `<div class="card notice gap">
          <p><b>${late.map((c) => esc(c.label)).join(' · ')}</b> 예약을 서둘러주세요.</p>
          <p>${late.map((c) => `${esc(c.label)} ${esc(c.by)}`).join(' · ')}까지 예약하셔야 하는데
             지금 ${Math.floor(d / 30)}개월 남았어요.</p>
        </div>`
     : d === null
-      ? `<div class="card notice"><p><b>예식일을 정하시면 시점을 챙겨드릴게요.</b></p>
+      ? `<div class="card notice gap"><p><b>예식일을 정하시면 시점을 챙겨드릴게요.</b></p>
          <p>예약 시점은 모두 예식일을 기준으로 세어드려요.</p></div>`
       : '';
 
@@ -228,14 +228,108 @@ function doneView() {
   $('#home').onclick = () => (location.hash = '#/');
 }
 
-// ── 기록이 없을 때 ───────────────────────────────────────────────────────
-// 온보딩을 마쳤어도 기록은 0곳이다. 빈 표를 보여주는 대신
-// 이 화면이 "이게 뭔지 · 지금 뭘 하면 되는지"를 말한다.
-// 온보딩을 건너뛴 사람에게는 이 화면이 첫 화면이 된다.
-function introView() {
+// 예식일 카드 — 홈과 웨딩홀 화면이 같이 쓴다
+function ddayCard(p, late) {
+  const d = daysToCeremony(p);
+  if (d === null) return '';
+  return `
+    <div class="dday">
+      <span class="n">D-${d}</span>
+      <span class="t">${esc(dateLabel(p.ceremonyDate))}${
+        p.ceremonyDateStatus === 'tentative' ? ' · 가예약' : ''
+      }</span>
+      ${late.length
+        ? `<span class="warn">${late.map((c) => esc(c.label)).join(' · ')} 예약을 서둘러주세요</span>`
+        : ''}
+    </div>`;
+}
+
+// ── 홈 — 준비 현황 ──────────────────────────────────────────────────────
+// 첫 화면은 특정 기능이 아니라 준비 전체다.
+// 웨딩홀 투어 기록은 여기서 버튼을 눌러 들어간다.
+function homeView() {
+  const p = store.profile();
+  const prep = prepStatus(p);
+  const late = prep.filter((c) => c.state === 'late');
+  const venues = store.venues();
+  const real = venues.filter((v) => !v.sample).length;
+
+  const rows = prep
+    .map((c) => {
+      const [txt, cls] = STATE_TXT[c.state];
+      return `<div class="row prep ${cls}">
+        <span class="k"><b>${c.label}</b><em>${esc(c.note)}</em></span>
+        <span class="st">${txt}</span>
+      </div>`;
+    })
+    .join('');
+
+  const venueSub = venues.length === 0
+    ? '아직 적어둔 곳이 없어요'
+    : real === 0
+      ? '예시로 둘러보는 중이에요'
+      : `${real}곳 적어두셨어요`;
+
   app.innerHTML = `
-    ${brand()}
-    <h1 class="hero">웨딩홀 투어,<br />적어두고 나란히 비교하세요</h1>
+    ${brand('결혼 준비')}
+    <div style="height:18px"></div>
+    ${ddayCard(p, late)}
+    ${daysToCeremony(p) === null
+      ? `<div class="card notice">
+           <p><b>예식일을 정하시면 시점을 챙겨드릴게요.</b></p>
+           <p>예약 시점은 모두 예식일을 기준으로 세어드려요.</p>
+         </div>` : ''}
+
+    <h2 class="section-title">준비 현황
+      <button class="linkish" id="redo">답 수정</button>
+    </h2>
+    <div class="card">${rows}</div>
+
+    <h2 class="section-title">웨딩홀</h2>
+    <div class="card choice">
+      <button class="choice-row" id="go-venues">
+        <span class="ico">📝</span>
+        <span class="txt">
+          <b>투어 기록</b>
+          <em>${esc(venueSub)}</em>
+        </span>
+        <span class="arr">›</span>
+      </button>
+      <button class="choice-row" id="go-guide">
+        <span class="ico">🔍</span>
+        <span class="txt">
+          <b>투어 준비</b>
+          <em>투어에서 확인할 것</em>
+        </span>
+        <span class="arr">›</span>
+      </button>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-quiet" id="export">내보내기</button>
+      <button class="btn btn-quiet" id="import">불러오기</button>
+    </div>
+    <input type="file" id="file" accept="application/json" hidden />
+
+    <p class="note">
+      기록은 <b>이 브라우저에만</b> 저장돼요. 다른 기기나 상대방 폰에서는 보이지 않아요.
+      옮기실 때는 내보내기를 쓰세요.
+    </p>
+  `;
+  $('#redo').onclick = () => (location.hash = '#/start/1');
+  $('#go-venues').onclick = () => (location.hash = '#/venues');
+  $('#go-guide').onclick = () => (location.hash = '#/guide');
+  $('#export').onclick = doExport;
+  $('#import').onclick = () => $('#file').click();
+  $('#file').onchange = doImport;
+}
+
+// ── 웨딩홀 기록이 0곳일 때 ───────────────────────────────────────────────
+// 빈 비교표를 보여주는 대신 갈래를 나눈다.
+function venueEmptyView() {
+  app.innerHTML = `
+    <button class="back" id="back">‹ 홈</button>
+    <h1 class="hero sm">웨딩홀 투어,<br />적어두고 나란히 비교하세요</h1>
     <p class="hero-sub">
       받은 견적을 그대로 적으면 <b>실제로 얼마인지</b> 계산해드려요.
       홀 사용료만 보면 식대가 빠져 실제 금액을 알 수 없습니다.
@@ -263,36 +357,18 @@ function introView() {
     <button class="btn btn-quiet" id="demo" style="margin-top:12px">
       예시로 먼저 둘러보기
     </button>
-
-    <h2 class="section-title">이 앱이 하는 일</h2>
-    <div class="card">
-      <div class="row do"><span class="k">여러 홀을 나란히 비교</span><span class="mark yes">✓</span></div>
-      <div class="row do"><span class="k">홀 사용료 + 꽃장식 + (보증인원 × 식대) 합산</span><span class="mark yes">✓</span></div>
-      <div class="row do"><span class="k">투어 전에 확인할 것 알려주기</span><span class="mark yes">✓</span></div>
-      <div class="row do"><span class="k">시세 · 평균가 알려주기</span><span class="mark no">✕</span></div>
-      <div class="row do"><span class="k">업체 추천 · 순위 매기기</span><span class="mark no">✕</span></div>
-    </div>
-    <p class="note">
-      가격은 지역 · 시기마다 달라서, 어떤 기준값을 보여줘도 틀린 숫자를 믿게 만듭니다.
-      그래서 <b>적어두신 것만</b> 계산합니다.
-    </p>
-
-    <div class="card notice">
-      <p><b>기록은 이 브라우저에만 저장돼요.</b></p>
-      <p>다른 기기나 상대방 폰에서는 보이지 않습니다.
-         투어 다녀오시면 <b>내보내기</b>로 백업해두세요.</p>
-    </div>
   `;
+  $('#back').onclick = () => (location.hash = '#/');
   $('#go-record').onclick = () => (location.hash = '#/new');
   $('#go-guide').onclick = () => (location.hash = '#/guide');
-  $('#demo').onclick = () => { store.loadSample(); location.hash = '#/'; render(); };
+  $('#demo').onclick = () => { store.loadSample(); location.hash = '#/venues'; render(); };
 }
 
 // ── 웨딩홀 투어 준비 ─────────────────────────────────────────────────────
 // 항목은 박람회 자료의 웨딩홀 구성에서 왔지만, 화면에서는 앱이 직접 챙겨준다.
 function guideView() {
   app.innerHTML = `
-    <button class="back" id="back">‹ 처음으로</button>
+    <button class="back" id="back">‹ 홈</button>
     <h1 class="hero sm">웨딩홀 투어 준비</h1>
     <p class="hero-sub">
       투어 가시면 이것만 확인하시면 돼요.
@@ -335,31 +411,20 @@ function guideView() {
   $('#record').onclick = () => (location.hash = '#/new');
 }
 
-// ── 목록 + 비교 ──────────────────────────────────────────────────────────
-function listView() {
+// ── 웨딩홀 목록 + 비교 ──────────────────────────────────────────────────
+function venueListView() {
   const venues = store.venues();
-  if (!venues.length) return introView();
+  if (!venues.length) return venueEmptyView();
 
   const hasSample = venues.some((v) => v.sample);
-
   const p = store.profile();
-  const d = daysToCeremony(p);
-  const late = prepStatus(p).filter((c) => c.state === 'late');
-  const dday = d === null ? '' : `
-    <div class="dday">
-      <span class="n">D-${d}</span>
-      <span class="t">${esc(dateLabel(p.ceremonyDate))}${
-        p.ceremonyDateStatus === 'tentative' ? ' · 가예약' : ''
-      }</span>
-      ${late.length
-        ? `<span class="warn">${late.map((c) => esc(c.label)).join(' · ')} 예약을 서둘러주세요</span>`
-        : ''}
-    </div>`;
+  const venueLate = prepStatus(p).filter((c) => c.state === 'late' && c.key === 'venueStatus');
 
   app.innerHTML = `
-    ${brand('웨딩홀')}
-    <p class="sub">투어하면서 적은 것을 나란히 봅니다</p>
-    ${dday}
+    <button class="back" id="back">‹ 홈</button>
+    <h1 class="hero sm">웨딩홀 투어 기록</h1>
+    <p class="hero-sub">투어하면서 적은 것을 나란히 봅니다.</p>
+    ${ddayCard(p, venueLate)}
 
     ${hasSample ? `
       <div class="card notice sample">
@@ -389,29 +454,18 @@ function listView() {
       ? compareTable(venues)
       : `<p class="note">한 곳 더 기록하면 <b>비교표</b>가 나타납니다.</p>`}
 
-    <div class="btn-row">
-      <button class="btn btn-quiet" id="export">내보내기</button>
-      <button class="btn btn-quiet" id="import">불러오기</button>
-    </div>
-    <input type="file" id="file" accept="application/json" hidden />
-
     <p class="note">
-      앱은 순위를 매기거나 추천하지 않아요. 적어두신 것을 나란히 놓아드릴 뿐이에요.<br />
-      기록은 <b>이 브라우저에만</b> 저장돼요. 다른 기기에서 보시려면 내보내기를 쓰세요.<br />
-      <button class="linkish" id="guide">투어 준비 다시 보기</button> ·
-      <button class="linkish" id="redo">처음 답한 내용 수정</button>
+      적어두신 것을 나란히 놓아드릴 뿐이에요. 순위를 매기거나 추천하지 않아요.<br />
+      <button class="linkish" id="guide">투어 준비 다시 보기</button>
     </p>
   `;
 
+  $('#back').onclick = () => (location.hash = '#/');
   $('#add').onclick = () => (location.hash = '#/new');
   $('#guide').onclick = () => (location.hash = '#/guide');
-  $('#redo').onclick = () => (location.hash = '#/start/1');
   app.querySelectorAll('[data-go]').forEach((b) => {
     b.onclick = () => (location.hash = '#/v/' + b.dataset.go);
   });
-  $('#export').onclick = doExport;
-  $('#import').onclick = () => $('#file').click();
-  $('#file').onchange = doImport;
   if (hasSample) {
     $('#clear-sample').onclick = () => {
       if (confirm('예시 데이터를 지울까요?')) { store.clearSample(); render(); }
@@ -472,7 +526,7 @@ function compareTable(venues) {
 // ── 기록 (입력) ──────────────────────────────────────────────────────────
 function editView(id) {
   const existing = id ? store.venue(id) : null;
-  if (id && !existing) return (location.hash = '#/');
+  if (id && !existing) return (location.hash = '#/venues');
   const v = existing ? structuredClone(existing) : blankVenue();
   const isNew = !existing;
 
@@ -484,7 +538,7 @@ function editView(id) {
     </div>`;
 
   app.innerHTML = `
-    <button class="back" id="back">‹ 웨딩홀</button>
+    <button class="back" id="back">‹ 투어 기록</button>
     <h1 class="hero sm">웨딩홀 기록</h1>
     <p class="hero-sub">투어하면서 바로 적어보세요 · 자동 저장돼요</p>
 
@@ -596,13 +650,13 @@ function editView(id) {
     }
   }
 
-  $('#back').onclick = () => (location.hash = '#/');
-  $('#done').onclick = () => { persist(); location.hash = '#/'; };
+  $('#back').onclick = () => (location.hash = '#/venues');
+  $('#done').onclick = () => { persist(); location.hash = '#/venues'; };
   if (existing) {
     $('#del').onclick = () => {
       if (confirm(`'${v.name || '이 웨딩홀'}' 기록을 지울까요?`)) {
         store.remove(v.id);
-        location.hash = '#/';
+        location.hash = '#/venues';
       }
     };
   }
@@ -653,7 +707,8 @@ function render() {
   if (h === '#/guide') return guideView();
   if (h === '#/new') return editView(null);
   if (h.startsWith('#/v/')) return editView(h.slice(4));
-  return listView();
+  if (h === '#/venues') return venueListView();
+  return homeView();
 }
 
 addEventListener('hashchange', render);
