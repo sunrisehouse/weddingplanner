@@ -1,7 +1,7 @@
 import {
   store, blankVenue, blankSdm, total,
   daysToCeremony, monthsToCeremony, ceremonyAnchor, prepStatus,
-  SDM_SERVICES, SDM_EXTRAS, SDM_STEPS, SDM_MID_PCT, SDM_FINAL_PCT,
+  SDM_PARTS, SDM_SERVICES, SDM_EXTRAS, extrasOf, SDM_STEPS, SDM_MID_PCT, SDM_FINAL_PCT,
   SDM_MID_DAYS, SDM_FINAL_DAYS, SDM_PENALTY_DAYS, sdmDates, sdmTotal,
   choiceCount, HONEYMOON_COSTS, honeymoonTotal,
   HONSU_CHOICES, HOME_ITEMS, honsuCount, homeCount, honsuDates,
@@ -540,9 +540,21 @@ function choiceCard() {
     .filter(([, on]) => on)
     .map(([k]) => k);
 
+  // 품목 머리줄 — 무엇의 조건인지 한 줄로 갈라준다
+  const head = (key) => {
+    const [, label, hint] = SDM_PARTS.find(([k]) => k === key);
+    const extras = extrasOf(key);
+    return `<div class="row grouphead">
+      <span class="gk">${label}</span>
+      <span class="gh">${esc(hint)}${
+        extras.length ? ` · 별도 ${extras.map((x) => x.label).join(' · ')}` : ''
+      }</span>
+    </div>`;
+  };
+
   const yn = (key, label, hint) => `
     <div class="row withhint">
-      <span class="k"><b>${label}</b><em>${esc(hint)}</em></span>
+      <span class="k"><b>${label}</b>${hint ? `<em>${esc(hint)}</em>` : ''}</span>
       <span class="seg" data-choice3="${key}">
         ${[['yes', '할게요'], ['no', '안 할래요'], ['unknown', '미정']].map(([v, l]) =>
           `<button type="button" data-v="${v}" aria-pressed="${(c[key] ?? 'unknown') === v}">${l}</button>`
@@ -569,18 +581,25 @@ function choiceCard() {
       <span class="hint">${n.done} / ${n.total} 정함</span>
     </h2>
     <div class="card">
+      ${head('studio')}
       <div class="row withhint">
         <span class="k"><b>앨범 · 액자</b><em>계약서엔 20p 앨범 · 기본 액자로 인쇄돼 있어요.
           세미 액자로 하면 구성이 달라져요</em></span>
         <input type="text" data-choice-text="album" value="${esc(c.album)}"
                placeholder="예: 20p 1권 + 20R 액자" />
       </div>
-      ${pair('드레스', '자료엔 촬영 3벌 / 본식 1벌. 신랑 예복은 별도예요',
-        ['dressShoot', '촬영', '벌'], ['dressMain', '본식', '벌'])}
-      ${pair('헤어 · 메이크업', '신랑 · 신부 각각이에요. 자료엔 촬영 1회 / 본식 1회',
-        ['hairShoot', '촬영', '회'], ['hairMain', '본식', '회'])}
       ${yn('origin', '원본 데이터', '계약 금액 밖이라 따로 사야 해요')}
-      ${yn('bouquet', '부케', '기본부케 1 · 부토니아 1 · 코사지 6')}
+
+      ${head('dress')}
+      ${pair('벌수', '자료엔 촬영 3벌 / 본식 1벌. 신랑 예복은 별도예요',
+        ['dressShoot', '촬영', '벌'], ['dressMain', '본식', '벌'])}
+
+      ${head('makeup')}
+      ${pair('횟수', '신랑 · 신부 각각이에요. 자료엔 촬영 1회 / 본식 1회',
+        ['hairShoot', '촬영', '회'], ['hairMain', '본식', '회'])}
+
+      ${head('bouquet')}
+      ${yn('bouquet', '부케', '')}
     </div>
     <p class="formula">
       정해두시면 업체마다 같은 조건으로 견적을 받을 수 있어요.
@@ -659,10 +678,12 @@ function sdmIntro(head) {
       <span class="hint">계약 금액 밖 ${SDM_EXTRAS.length}개</span>
     </h2>
     <div class="card">
-      ${SDM_EXTRAS.map(([, label, hint]) => `
-        <div class="row withhint">
-          <span class="k"><b>${label}</b><em>${esc(hint)}</em></span>
-        </div>`).join('')}
+      ${SDM_PARTS.filter(([k]) => extrasOf(k).length).map(([k, label]) => `
+        <div class="row grouphead"><span class="gk">${label}</span></div>
+        ${extrasOf(k).map(({ label: l, hint }) => `
+          <div class="row withhint">
+            <span class="k"><b>${l}</b>${hint ? `<em>${esc(hint)}</em>` : ''}</span>
+          </div>`).join('')}`).join('')}
     </div>
     <p class="note">
       계약 총액만 보면 실제 지출을 알 수 없어요. <b>이 ${SDM_EXTRAS.length}개를 다 물어봐야</b>
@@ -765,14 +786,16 @@ function sdmContracted(head, p, picked, list) {
 
     <h2 class="section-title">계약 금액 밖의 항목</h2>
     <div class="card">
-      ${SDM_EXTRAS.map(([k, label]) => {
-        const v = picked.extras?.[k];
-        const has = !(v === null || v === '' || v === undefined);
-        return `<div class="row">
-          <span class="k">${label}</span>
-          <span class="v${has ? '' : ' none'}">${has ? won(v) + '원' : '미입력'}</span>
-        </div>`;
-      }).join('')}
+      ${SDM_PARTS.filter(([k]) => extrasOf(k).length).map(([k, label]) => `
+        <div class="row grouphead"><span class="gk">${label}</span></div>
+        ${extrasOf(k).map(({ key, label: l }) => {
+          const x = picked.extras?.[key];
+          const has = !(x === null || x === '' || x === undefined);
+          return `<div class="row">
+            <span class="k">${l}</span>
+            <span class="v${has ? '' : ' none'}">${has ? won(x) + '원' : '미입력'}</span>
+          </div>`;
+        }).join('')}`).join('')}
     </div>
     <p class="note">
       금액을 고치시려면 <button class="linkish" data-go-sdm="${picked.id}">계약 내용</button>에서 적어주세요.
@@ -826,47 +849,85 @@ function sdmCard(v) {
     </div>`;
 }
 
-// 비교표 — 별도 항목까지 나란히 놓는다. 그게 자료의 요지다.
+// 비교표 — 품목별로 묶어 나란히 놓는다.
+// 뭉쳐 놓으면 어느 품목의 조건인지 알 수 없다.
 function sdmTable(list) {
   const head = list
     .map((v) => `<th class="col">${esc(v.name || '이름 없음')}
         <span class="date">${v.consultDate ? esc(dateLabel(v.consultDate)) : '날짜 미입력'}</span></th>`)
     .join('');
 
-  const row = (label, pick, unit = '원') =>
-    `<tr><th class="k">${label}</th>${list
-      .map((v) => {
-        const x = pick(v);
-        return x === null || x === '' || x === undefined
-          ? '<td class="empty">미입력</td>'
-          : `<td class="num">${won(x)}${unit}</td>`;
-      })
-      .join('')}</tr>`;
+  const cells = (pick) => list.map(pick).join('');
+
+  const money = (label, get) =>
+    `<tr><th class="k">${label}</th>${cells((v) => {
+      const x = get(v);
+      return x === null || x === '' || x === undefined
+        ? '<td class="empty">미입력</td>'
+        : `<td class="num">${won(x)}원</td>`;
+    })}</tr>`;
+
+  const count = (label, get, unit) =>
+    `<tr><th class="k">${label}</th>${cells((v) => {
+      const x = get(v);
+      return x === null || x === '' || x === undefined
+        ? '<td class="empty">미입력</td>'
+        : `<td class="num">${x}${unit}</td>`;
+    })}</tr>`;
+
+  const text = (label, get) =>
+    `<tr><th class="k">${label}</th>${cells((v) =>
+      get(v) ? `<td class="wrap">${esc(get(v))}</td>` : '<td class="empty">미입력</td>'
+    )}</tr>`;
+
+  const tri = (label, get) =>
+    `<tr><th class="k">${label}</th>${cells((v) => {
+      const x = get(v);
+      return x === 'yes' ? '<td class="yes">포함</td>'
+        : x === 'no' ? '<td class="no">별도</td>'
+        : '<td class="empty">모름</td>';
+    })}</tr>`;
+
+  const group = (key) => {
+    const [, label] = SDM_PARTS.find(([k]) => k === key);
+    return `<tr class="grp"><th class="k" colspan="${list.length + 1}">${label}</th></tr>`;
+  };
 
   return `
-    <h2 class="section-title">비교</h2>
+    <h2 class="section-title">비교
+      <span class="hint">품목별로</span>
+    </h2>
     <div class="card compare-scroll">
       <table class="compare">
         <thead><tr><th class="k"></th>${head}</tr></thead>
         <tbody>
-          ${row('견적 금액', (v) => v.quotePrice)}
-          ${row('촬영 드레스', (v) => v.shootDress, '벌')}
-          ${row('본식 드레스', (v) => v.mainDress, '벌')}
-          ${SDM_EXTRAS.map(([k, label]) => row(label, (v) => v.extras?.[k])).join('')}
-          <tr class="total-row"><th class="k">별도 합계</th>${list
-            .map((v) => {
-              const t = sdmTotal(v);
-              return `<td class="num">${won(t.extraSum)}원</td>`;
-            })
-            .join('')}</tr>
-          <tr class="total-row"><th class="k">실제 예상</th>${list
-            .map((v) => {
-              const t = sdmTotal(v);
-              return t.ok
-                ? `<td class="num">${won(t.sum)}원</td>`
-                : '<td class="empty">계산 불가</td>';
-            })
-            .join('')}</tr>
+          ${money('견적 금액', (v) => v.quotePrice)}
+
+          ${group('studio')}
+          ${text('앨범 · 액자', (v) => v.album)}
+          ${extrasOf('studio').map((x) => money(x.label, (v) => v.extras?.[x.key])).join('')}
+
+          ${group('dress')}
+          ${count('촬영 벌수', (v) => v.shootDress, '벌')}
+          ${count('본식 벌수', (v) => v.mainDress, '벌')}
+          ${extrasOf('dress').map((x) => money(x.label, (v) => v.extras?.[x.key])).join('')}
+
+          ${group('makeup')}
+          ${count('촬영 횟수', (v) => v.hairShoot, '회')}
+          ${count('본식 횟수', (v) => v.hairMain, '회')}
+          ${extrasOf('makeup').map((x) => money(x.label, (v) => v.extras?.[x.key])).join('')}
+
+          ${group('bouquet')}
+          ${tri('부케', (v) => v.bouquet)}
+
+          <tr class="total-row"><th class="k">별도 합계</th>${cells((v) =>
+            `<td class="num">${won(sdmTotal(v).extraSum)}원</td>`)}</tr>
+          <tr class="total-row"><th class="k">실제 예상</th>${cells((v) => {
+            const t = sdmTotal(v);
+            return t.ok
+              ? `<td class="num">${won(t.sum)}원</td>`
+              : '<td class="empty">계산 불가</td>';
+          })}</tr>
         </tbody>
       </table>
     </div>`;
@@ -890,6 +951,23 @@ function sdmEdit(id) {
              value="${v[key] ?? ''}" placeholder="미입력" />
     </div>`;
 
+  // 정해둔 값이 있으면 힌트로 붙인다 — 업체가 그보다 적게 주면 그 자리에서 보인다
+  const numWithChoice = (key, label, decided, unit) => `
+    <div class="row${decided === null || decided === undefined ? '' : ' withhint'}">
+      ${decided === null || decided === undefined
+        ? `<label for="${key}">${label} (${unit})</label>`
+        : `<span class="k"><b>${label} (${unit})</b><em>정하신 건 ${decided}${unit}</em></span>`}
+      <input id="${key}" type="number" inputmode="numeric" data-x="${key}"
+             value="${v[key] ?? ''}" placeholder="미입력" />
+    </div>`;
+
+  const extraRow = ({ key, label, hint }) => `
+    <div class="row withhint">
+      <span class="k"><b>${label}</b><em>별도${hint ? ' · ' + esc(hint) : ''}</em></span>
+      <input id="x-${key}" type="number" inputmode="numeric" data-extra="${key}"
+             value="${v.extras?.[key] ?? ''}" placeholder="미입력" />
+    </div>`;
+
   app.innerHTML = `
     <button class="back" id="back">‹ 스드메</button>
     <h1 class="hero sm">${isNew ? '업체 기록' : esc(v.name || '업체 기록')}</h1>
@@ -910,20 +988,11 @@ function sdmEdit(id) {
     <h2 class="section-title">받은 견적 <span class="hint">정하신 조건으로</span></h2>
     <div class="card">
       ${money('quotePrice', '견적 금액', '정하신 조건으로 받은 금액')}
-      <div class="row${c.dressShoot === null ? '' : ' withhint'}">
-        ${c.dressShoot === null
-          ? '<label for="shootDress">촬영 드레스 (벌)</label>'
-          : `<span class="k"><b>촬영 드레스 (벌)</b><em>정하신 건 ${c.dressShoot}벌</em></span>`}
-        <input id="shootDress" type="number" inputmode="numeric" data-x="shootDress"
-               value="${v.shootDress ?? ''}" placeholder="미입력" />
-      </div>
-      <div class="row${c.dressMain === null ? '' : ' withhint'}">
-        ${c.dressMain === null
-          ? '<label for="mainDress">본식 드레스 (벌)</label>'
-          : `<span class="k"><b>본식 드레스 (벌)</b><em>정하신 건 ${c.dressMain}벌</em></span>`}
-        <input id="mainDress" type="number" inputmode="numeric" data-x="mainDress"
-               value="${v.mainDress ?? ''}" placeholder="미입력" />
-      </div>
+    </div>
+
+    <h2 class="section-title">품목별 <span class="hint">업체가 주는 구성</span></h2>
+    <div class="card">
+      <div class="row grouphead"><span class="gk">스튜디오</span></div>
       <div class="row${c.album ? ' withhint' : ''}">
         ${c.album
           ? `<span class="k"><b>앨범 · 액자</b><em>정하신 건 ${esc(c.album)}</em></span>`
@@ -931,18 +1000,29 @@ function sdmEdit(id) {
         <input id="album" type="text" data-x="album" value="${esc(v.album)}"
                placeholder="예: 20p 1권 + 20R 액자" />
       </div>
-    </div>
+      ${extrasOf('studio').map(extraRow).join('')}
 
-    <h2 class="section-title">별도 비용
-      <span class="hint">계약 금액에 안 들어가요</span>
-    </h2>
-    <div class="card">
-      ${SDM_EXTRAS.map(([k, label, hint]) => `
-        <div class="row withhint">
-          <span class="k"><b>${label}</b><em>${esc(hint)}</em></span>
-          <input id="x-${k}" type="number" inputmode="numeric" data-extra="${k}"
-                 value="${v.extras?.[k] ?? ''}" placeholder="미입력" />
-        </div>`).join('')}
+      <div class="row grouphead"><span class="gk">드레스</span></div>
+      ${numWithChoice('shootDress', '촬영 벌수', c.dressShoot, '벌')}
+      ${numWithChoice('mainDress', '본식 벌수', c.dressMain, '벌')}
+      ${extrasOf('dress').map(extraRow).join('')}
+
+      <div class="row grouphead"><span class="gk">헤어 · 메이크업</span></div>
+      ${numWithChoice('hairShoot', '촬영 횟수', c.hairShoot, '회')}
+      ${numWithChoice('hairMain', '본식 횟수', c.hairMain, '회')}
+      ${extrasOf('makeup').map(extraRow).join('')}
+
+      <div class="row grouphead"><span class="gk">부케</span></div>
+      <div class="row">
+        <span class="k">견적에 포함</span>
+        <span class="seg" data-tri="bouquet">
+          ${[['yes', '포함'], ['no', '별도'], ['unknown', '모름']].map(([val, txt]) =>
+            `<button type="button" data-v="${val}"
+                     aria-pressed="${(v.bouquet ?? 'unknown') === val}">${txt}</button>`
+          ).join('')}
+        </span>
+      </div>
+
       <div class="row total">
         <span class="k"><b>실제 예상</b></span>
         <span class="v" id="sdm-total"></span>
@@ -992,6 +1072,11 @@ function sdmEdit(id) {
       persist();
       refresh();
     };
+  });
+  app.querySelectorAll('[data-tri]').forEach((seg) => {
+    seg.querySelectorAll('button').forEach((b) => {
+      b.onclick = () => { v[seg.dataset.tri] = b.dataset.v; persist(); sdmEdit(v.id); };
+    });
   });
 
   $('#back').onclick = () => { persist(); location.hash = '#/sdm'; };

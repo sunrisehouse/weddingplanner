@@ -437,9 +437,12 @@ export const blankSdm = () => ({
   name: '',
   consultDate: '',
   quotePrice: null,     // 업체가 준 견적 금액
-  shootDress: null,     // 촬영 드레스 벌수
-  mainDress: null,      // 본식 드레스 벌수
-  album: '',            // 앨범 · 액자 구성
+  album: '',            // 스튜디오 — 앨범 · 액자 구성
+  shootDress: null,     // 드레스 — 촬영 벌수
+  mainDress: null,      // 드레스 — 본식 벌수
+  hairShoot: null,      // 헤어메이크업 — 촬영 횟수
+  hairMain: null,       // 헤어메이크업 — 본식 횟수
+  bouquet: 'unknown',   // 부케 포함 — yes | no | unknown
   extras: {},           // 별도 항목별 금액 (모르면 비움)
   memo: '',
 });
@@ -482,19 +485,32 @@ export function choiceCount(c) {
   return { done: done.filter(Boolean).length, total: done.length };
 }
 
+// 스드메는 세 가지다 — 스튜디오 · 드레스 · 헤어메이크업. 부케까지 네 품목.
+// 자료의 `품목` 열 그대로이고, 화면도 이 묶음으로 보여준다.
+// 한 덩어리로 뭉치면 무엇이 무엇의 조건인지 알 수 없다.
+export const SDM_PARTS = [
+  ['studio', '스튜디오', '촬영 · 앨범 · 액자'],
+  ['dress', '드레스', '촬영 · 본식'],
+  ['makeup', '헤어 · 메이크업', '신랑 · 신부 각각'],
+  ['bouquet', '부케', '부케 1 · 부토니아 1 · 코사지 6'],
+];
+
 // 계약서에 인쇄된 '별도' 항목. 계약 금액에 포함되지 않는다.
 // 앱이 금액을 제시하지 않는다 — 업체에서 받은 금액을 직접 적는다.
+// part = 어느 품목에 붙는 비용인지
 export const SDM_EXTRAS = [
-  ['origin', '원본 데이터', '스튜디오 · 별도 구입'],
-  ['retouch', '선수정본', '스튜디오'],
-  ['helperShoot', '헬퍼비 (촬영)', '드레스 · 촬영과 본식에 각각 발생'],
-  ['helperMain', '헬퍼비 (본식)', '드레스'],
-  ['tourFee', '드레스 투어비', '샵당 발생 · 피팅비 5.5만원~'],
-  ['tripShoot', '출장비 (촬영)', '청담 이외 지역 · 5시간 기준'],
-  ['tripMain', '출장비 (본식)', '서울 이외 지역'],
-  ['early', '얼리스타트', '메이크업 · 8시 이전'],
-  ['late', '테이블 비용', '메이크업 · 17시 이후'],
+  { key: 'origin', part: 'studio', label: '원본 데이터', hint: '별도 구입' },
+  { key: 'retouch', part: 'studio', label: '선수정본', hint: '' },
+  { key: 'helperShoot', part: 'dress', label: '헬퍼비 (촬영)', hint: '촬영과 본식에 각각 발생' },
+  { key: 'helperMain', part: 'dress', label: '헬퍼비 (본식)', hint: '' },
+  { key: 'tourFee', part: 'dress', label: '투어비', hint: '샵당 발생 · 피팅비 5.5만원~' },
+  { key: 'tripShoot', part: 'dress', label: '출장비 (촬영)', hint: '청담 이외 지역 · 5시간 기준' },
+  { key: 'tripMain', part: 'dress', label: '출장비 (본식)', hint: '서울 이외 지역' },
+  { key: 'early', part: 'makeup', label: '얼리스타트', hint: '8시 이전' },
+  { key: 'late', part: 'makeup', label: '테이블 비용', hint: '17시 이후' },
 ];
+
+export const extrasOf = (part) => SDM_EXTRAS.filter((x) => x.part === part);
 
 // 스드메 준비 단계 (촬영일은 따로 다룬다)
 export const SDM_STEPS = [
@@ -519,8 +535,8 @@ export function sdmTotal(v) {
   let sum = hasPackage ? Number(p) : 0;
   let missing = hasPackage ? 0 : 1;
   let extraSum = 0;
-  for (const [k] of SDM_EXTRAS) {
-    const x = v?.extras?.[k];
+  for (const { key } of SDM_EXTRAS) {
+    const x = v?.extras?.[key];
     if (x === null || x === '' || x === undefined) missing += 1;
     else { extraSum += Number(x); sum += Number(x); }
   }
