@@ -3,7 +3,8 @@ import {
   daysToCeremony, monthsToCeremony, ceremonyAnchor, prepStatus,
   SDM_SERVICES, SDM_EXTRAS, SDM_STEPS, SDM_MID_PCT, SDM_FINAL_PCT,
   SDM_MID_DAYS, SDM_FINAL_DAYS, SDM_PENALTY_DAYS, sdmDates, sdmTotal,
-  choiceCount, HONEYMOON_COSTS, honeymoonTotal, HONSU_ITEMS,
+  choiceCount, HONEYMOON_COSTS, honeymoonTotal,
+  HONSU_CHOICES, HOME_ITEMS, honsuCount, homeCount, honsuDates,
 } from './store.js';
 import { photos } from './photos.js';
 
@@ -1115,10 +1116,28 @@ function honeymoonView() {
 
 // ── 혼수 ────────────────────────────────────────────────────────────────
 // 탭까지 두지는 않는다. 홈의 준비 현황에서 눌러 들어온다.
-// 품목마다 할지 말지가 갈리니 준비 / 생략 / 미정을 남긴다.
+//
+// 혼수도 사 오는 게 아니라 품목마다 고르는 일이다. 자료의 `내용` 열에
+// 갈래가 적혀 있어 그대로 선택지가 된다.
+// 시점 기준도 예식일이 아니다 — 한복은 촬영일, 살림은 입주일에서 나온다.
 function honsuView() {
-  const items = store.plan('honsu');
-  const decided = HONSU_ITEMS.filter(([k]) => items[k] && items[k] !== 'unknown').length;
+  const h = store.plan('honsu');
+  const sdm = store.plan('sdm');
+  const n = honsuCount(h);
+  const hm = homeCount(h);
+  const d = honsuDates(h, sdm);
+
+  const choiceRow = ({ key, label, hint, opts }) => `
+    <div class="row withhint stack">
+      <span class="k"><b>${label}</b><em>${esc(hint)}</em></span>
+      <span class="seg" data-honsu="${key}">
+        ${opts.map(([v, l]) =>
+          `<button type="button" data-v="${v}" aria-pressed="${(h[key] ?? 'unknown') === v}">${l}</button>`
+        ).join('')}
+        <button type="button" data-v="unknown"
+                aria-pressed="${(h[key] ?? 'unknown') === 'unknown'}">미정</button>
+      </span>
+    </div>`;
 
   app.innerHTML = `
     <button class="back" id="back">‹ 홈</button>
@@ -1126,34 +1145,59 @@ function honsuView() {
     <p class="hero-sub">한복 · 웨딩반지 · 예복 · 예단 · 가전/가구</p>
     ${statusCard('honsuStatus')}
 
-    <h2 class="section-title">품목
-      <span class="hint">${decided} / ${HONSU_ITEMS.length} 정함</span>
+    <h2 class="section-title">정할 것
+      <span class="hint">${n.done} / ${n.total} 정함</span>
     </h2>
     <div class="card">
-      ${HONSU_ITEMS.map(([k, label, hint]) => `
-        <div class="row withhint">
-          <span class="k"><b>${label}</b><em>${esc(hint)}</em></span>
-          <span class="seg" data-item="${k}">
+      ${HONSU_CHOICES.map(choiceRow).join('')}
+    </div>
+    ${d.hanbok
+      ? `<p class="formula">한복은 <b>${mdLabel(d.hanbok)}까지</b> 맞추거나 빌리세요 ·
+           촬영 2개월 전이에요</p>`
+      : `<p class="formula">한복은 촬영 2개월 전이에요.
+           <button class="linkish" id="go-sdm">스드메에서 촬영일</button>을 넣으면 날짜로 알려드려요</p>`}
+
+    <h2 class="section-title">신혼집 살림
+      <span class="hint">${hm.done} / ${hm.total} 정함</span>
+    </h2>
+    <div class="card">
+      ${dateRow('moveInDate', '입주 예정일', h.moveInDate,
+        d.home ? `${mdLabel(d.home)}까지 준비하세요 · 입주 2개월 전` : '입주 2~3개월 전에 준비해요')}
+      ${HOME_ITEMS.map(([k, label]) => `
+        <div class="row">
+          <span class="k">${label}</span>
+          <span class="seg" data-home="${k}">
             ${[['yes', '준비'], ['no', '생략'], ['unknown', '미정']].map(([v, l]) =>
-              `<button type="button" data-v="${v}" aria-pressed="${(items[k] ?? 'unknown') === v}">${l}</button>`
+              `<button type="button" data-v="${v}" aria-pressed="${(h.home?.[k] ?? 'unknown') === v}">${l}</button>`
             ).join('')}
           </span>
         </div>`).join('')}
     </div>
     <p class="note">
-      혼수는 <b>예단 3개월 전</b>을 기준으로 챙겨드려요.
-      한복은 <b>촬영 2개월 전</b>, 가전·가구는 <b>입주 2~3개월 전</b>이라 예식일로 세지 않았어요.
+      살림은 <b>신혼집에 맞춰</b> 사는 것들이라 예식일이 아니라 입주일이 기준이에요.
+      예단만 예식 3개월 전으로 챙겨드려요.
     </p>
   `;
 
   $('#back').onclick = () => (location.hash = '#/');
-  app.querySelectorAll('[data-item]').forEach((seg) => {
+  const goSdm = $('#go-sdm');
+  if (goSdm) goSdm.onclick = () => (location.hash = '#/sdm');
+
+  app.querySelectorAll('[data-honsu]').forEach((seg) => {
+    seg.querySelectorAll('button').forEach((b) => {
+      b.onclick = () => { store.setPlan('honsu', { [seg.dataset.honsu]: b.dataset.v }); render(); };
+    });
+  });
+  app.querySelectorAll('[data-home]').forEach((seg) => {
     seg.querySelectorAll('button').forEach((b) => {
       b.onclick = () => {
-        store.setPlan('honsu', { [seg.dataset.item]: b.dataset.v });
+        store.setPlan('honsu', { home: { ...h.home, [seg.dataset.home]: b.dataset.v } });
         render();
       };
     });
+  });
+  app.querySelectorAll('[data-date]').forEach((el) => {
+    el.onchange = () => { store.setPlan('honsu', { [el.dataset.date]: el.value }); render(); };
   });
   bindStatus();
 }

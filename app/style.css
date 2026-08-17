@@ -341,3 +341,8 @@ h1.ob-q { font-size: 24px; line-height: 1.42; margin: 40px 0 0; letter-spacing: 
   background: var(--rose-bg); border-color: #f0dcd8; color: var(--rose); font-weight: 600;
 }
 .row.withhint input[type='text'] { flex: none; width: 46%; }
+
+/* 선택지가 길어 라벨 옆에 못 놓는 줄 — 아래로 쌓는다 */
+.row.stack { display: block; }
+.row.stack .seg { margin-top: 10px; display: flex; }
+.row.stack .seg button { flex: 1; padding: 6px 4px; }

@@ -65,8 +65,35 @@ function fillPlan(saved) {
                  services: { ...(p.sdm?.choices?.services ?? {}) } },
     },
     honeymoon: { ...base.honeymoon, ...(p.honeymoon ?? {}) },
-    honsu: { ...(p.honsu ?? {}) },
+    honsu: fillHonsu(p.honsu),
   };
+}
+
+// 예전엔 품목마다 yes / no / unknown 하나였다. 방식까지는 안 정한 상태로 옮긴다 —
+// 'no'는 생략으로, 'yes'는 "하기는 하는데 방식 미정"으로 둔다.
+function fillHonsu(saved) {
+  const p = saved ?? {};
+  const out = emptyHonsu();
+  const legacy = (v) => (v === 'no' ? 'skip' : 'unknown');
+  const take = (key, allowed, from) => {
+    if (allowed.includes(p[key])) return p[key];
+    if (from !== undefined && (from === 'yes' || from === 'no')) return legacy(from);
+    return 'unknown';
+  };
+
+  const METHOD = ['custom', 'rent', 'skip', 'unknown'];
+  for (const key of ['hanbokBride', 'hanbokGroom', 'hanbokMother']) {
+    out[key] = METHOD.includes(p[key]) ? p[key] : legacy(p.hanbok);
+  }
+  out.ring = take('ring', ['couple', 'couplePlus', 'skip', 'unknown'], p.ring);
+  out.suit = take('suit', METHOD, p.suit);
+  out.yedan = take('yedan', ['cash', 'cashGift', 'skip', 'unknown'], p.yedan);
+  out.moveInDate = p.moveInDate ?? '';
+  out.home = { ...(p.home ?? {}) };
+  // 예전 가전 · 생활용품 답
+  if (!out.home.appliance && p.appliance) out.home.appliance = p.appliance;
+  if (!out.home.living && p.living) out.home.living = p.living;
+  return out;
 }
 
 // 정해져 오는 패키지가 아니라 항목마다 정하는 것이므로 '패키지 금액'을 버렸다
@@ -534,12 +561,85 @@ export function honeymoonTotal(h) {
 }
 
 // ── 혼수 ──────────────────────────────────────────────────────────────────
-// 체크리스트 인쇄면의 혼수 품목. 시점 기준이 예식일이 아닌 것은 그대로 적어둔다.
-export const HONSU_ITEMS = [
-  ['hanbok', '한복', '신부 · 신랑 · 양가 어머님 · 촬영 2개월 전'],
-  ['ring', '웨딩반지', '커플링 · 예물'],
-  ['suit', '예복', '신랑 맞춤예복 · 턱시도 대여'],
-  ['yedan', '예단', '현금 또는 현금+예물 · 3개월 전'],
-  ['appliance', '가전 · 가구', '신혼집에 맞춰 · 입주 2~3개월 전'],
-  ['living', '주방용품 · 침구 · 생활용품', '신혼집에 맞춰 · 입주 2~3개월 전'],
+//
+// 혼수도 사 오는 게 아니라 품목마다 고르는 일이다. 자료의 `내용` 열에
+// 갈래가 그대로 적혀 있다 — 한복 맞춤/대여, 반지 커플링/예물,
+// 예복 맞춤/대여, 예단 현금/현금+예물.
+//
+// ⚠️ 자료에는 예상비용 범위도 있지만 화면에 쓰지 않는다.
+//    시세를 제시하는 셈이 되기 때문이다. 금액은 직접 적는다.
+export const HONSU_CHOICES = [
+  {
+    key: 'hanbokBride', label: '한복 (신부)',
+    hint: '치마 · 저고리 / 배자 · 두루마기 / 당의',
+    opts: [['custom', '맞춤'], ['rent', '대여'], ['skip', '안 할래요']],
+  },
+  {
+    key: 'hanbokGroom', label: '한복 (신랑)',
+    hint: '바지 · 저고리 · 조끼 · 마고자 / 두루마기 · 배자 / 쾌자',
+    opts: [['custom', '맞춤'], ['rent', '대여'], ['skip', '안 할래요']],
+  },
+  {
+    key: 'hanbokMother', label: '한복 (양가 어머님)',
+    hint: '치마 · 저고리',
+    opts: [['custom', '맞춤'], ['rent', '대여'], ['skip', '안 할래요']],
+  },
+  {
+    key: 'ring', label: '웨딩반지',
+    hint: '예물까지 하면 신부 다이아 · 진주 · 패션 set · 금가락지, 신랑 시계',
+    opts: [['couple', '커플링'], ['couplePlus', '예물까지'], ['skip', '안 할래요']],
+  },
+  {
+    key: 'suit', label: '예복',
+    hint: '신랑 맞춤예복 / 턱시도 대여 서비스',
+    opts: [['custom', '맞춤'], ['rent', '대여'], ['skip', '안 할래요']],
+  },
+  {
+    key: 'yedan', label: '예단',
+    hint: '예물까지 하면 이불 · 침구 · 반상기 · 은수저 등',
+    opts: [['cash', '현금'], ['cashGift', '현금+예물'], ['skip', '안 할래요']],
+  },
 ];
+
+// 신혼집에 맞춰 사는 것들 — 기준이 예식일이 아니라 입주일이다
+export const HOME_ITEMS = [
+  ['appliance', '가전 · 가구'],
+  ['kitchen', '주방용품'],
+  ['bedding', '침구'],
+  ['living', '생활용품'],
+];
+
+export const HANBOK_DAYS = 60;   // 촬영기준 2개월 전
+export const HOME_DAYS = 60;     // 입주기준 2~3개월 전 — 늦어도 2개월
+
+// 함수 선언이라 호이스팅된다 — read()가 모듈 위쪽에서 부른다
+export function emptyHonsu() {
+  return {
+    hanbokBride: 'unknown', hanbokGroom: 'unknown', hanbokMother: 'unknown',
+    ring: 'unknown',        // couple | couplePlus | skip | unknown
+    suit: 'unknown',        // custom | rent | skip | unknown
+    yedan: 'unknown',       // cash | cashGift | skip | unknown
+    moveInDate: '',         // 신혼집 입주 예정일
+    home: {},               // HOME_ITEMS 키 → yes | no | unknown
+  };
+}
+
+// 몇 가지를 정했는지
+export function honsuCount(h) {
+  const done = HONSU_CHOICES.filter(({ key }) => h?.[key] && h[key] !== 'unknown').length;
+  return { done, total: HONSU_CHOICES.length };
+}
+
+export function homeCount(h) {
+  const done = HOME_ITEMS.filter(([k]) => h?.home?.[k] && h.home[k] !== 'unknown').length;
+  return { done, total: HOME_ITEMS.length };
+}
+
+// 혼수의 마감. 예식일이 아니라 촬영일 · 입주일에서 나온다.
+export function honsuDates(honsu, sdm) {
+  const ok = (d) => d && !Number.isNaN(new Date(d + 'T00:00:00').getTime());
+  return {
+    hanbok: ok(sdm?.shootDate) ? shiftDays(sdm.shootDate, -HANBOK_DAYS) : null,
+    home: ok(honsu?.moveInDate) ? shiftDays(honsu.moveInDate, -HOME_DAYS) : null,
+  };
+}
