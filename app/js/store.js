@@ -5,7 +5,16 @@
 
 const KEY = 'weddingplanner.v1';
 
-const empty = () => ({ version: 1, venues: [], updatedAt: null });
+const emptyProfile = () => ({
+  ceremonyDateStatus: null,   // confirmed | tentative | unknown
+  ceremonyDate: '',
+  venueStatus: null,          // contracted | touring | none
+  guestEstimate: null,        // 숫자 또는 null(모름)
+  pyebaek: null,              // yes | no | unknown
+  onboardedAt: null,
+});
+
+const empty = () => ({ version: 1, venues: [], profile: emptyProfile(), updatedAt: null });
 
 function read() {
   try {
@@ -13,6 +22,7 @@ function read() {
     if (!raw) return empty();
     const data = JSON.parse(raw);
     if (data?.version !== 1 || !Array.isArray(data.venues)) return empty();
+    data.profile = { ...emptyProfile(), ...(data.profile ?? {}) };
     return data;
   } catch {
     return empty();
@@ -56,6 +66,19 @@ export const store = {
   get: () => state,
   venues: () => state.venues,
   venue: (id) => state.venues.find((v) => v.id === id) ?? null,
+
+  profile: () => state.profile,
+  onboarded: () => Boolean(state.profile.onboardedAt),
+
+  setProfile(patch) {
+    state.profile = { ...state.profile, ...patch };
+    commit();
+  },
+
+  finishOnboarding() {
+    state.profile.onboardedAt = new Date().toISOString();
+    commit();
+  },
 
   subscribe(fn) {
     listeners.add(fn);
@@ -110,6 +133,7 @@ export const store = {
     if (data?.version !== 1 || !Array.isArray(data.venues)) {
       throw new Error('이 파일은 웨딩플래너 백업 파일이 아닌 것 같아요.');
     }
+    data.profile = { ...emptyProfile(), ...(data.profile ?? {}) };
     state = data;
     commit();
   },
@@ -123,3 +147,16 @@ export function total(v) {
   }
   return Number(hallFee) + Number(flowers) + Number(guarantee) * Number(mealPrice);
 }
+
+// 예식일까지 남은 일수. 없으면 null.
+export function daysToCeremony(profile) {
+  if (!profile?.ceremonyDate) return null;
+  const d = new Date(profile.ceremonyDate + 'T00:00:00');
+  if (Number.isNaN(d.getTime())) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return Math.round((d - today) / 86400000);
+}
+
+// 자료 기준: 웨딩홀은 최소 10개월 전 예약
+export const VENUE_LEAD_DAYS = 300;

@@ -1,4 +1,4 @@
-import { store, blankVenue, total } from './store.js';
+import { store, blankVenue, total, daysToCeremony, VENUE_LEAD_DAYS } from './store.js';
 import { photos } from './photos.js';
 
 const $ = (sel, el = document) => el.querySelector(sel);
@@ -29,9 +29,174 @@ const brand = (sub = '') => `
     ${sub ? `<h1>${sub}</h1>` : ''}
   </header>`;
 
-// ── 첫 방문 ──────────────────────────────────────────────────────────────
-// 기록이 하나도 없을 때가 곧 첫 화면이다. 별도 온보딩을 클릭시키지 않고
-// 이 화면이 "이게 뭔지 · 지금 뭘 하면 되는지"를 대신한다.
+
+// ── 온보딩 — 한 화면에 질문 하나 ────────────────────────────────────────
+// 답을 실제로 쓰는 질문만 넣는다. 물어놓고 아무것도 안 하면
+// 안 물어본 것보다 나쁘다.
+const QUESTIONS = [
+  {
+    key: 'ceremonyDateStatus',
+    title: '결혼식 날짜가\n정해지셨나요?',
+    sub: '예약을 서둘러야 하는지 알려드릴게요',
+    options: [
+      { v: 'confirmed', l: '네, 확정했어요', next: 'date' },
+      { v: 'tentative', l: '가예약만 해뒀어요', next: 'date' },
+      { v: 'unknown', l: '아직요' },
+    ],
+  },
+  {
+    key: 'venueStatus',
+    title: '결혼식장은\n정하셨나요?',
+    sub: '',
+    options: [
+      { v: 'contracted', l: '계약까지 했어요' },
+      { v: 'touring', l: '투어 다니는 중이에요' },
+      { v: 'none', l: '아직 안 알아봤어요' },
+    ],
+  },
+  {
+    key: 'guestEstimate',
+    title: '하객은 몇 명쯤\n예상하세요?',
+    sub: '보증인원을 적을 때 기본값으로 넣어둘게요',
+    options: [
+      { v: 100, l: '100명 안팎' },
+      { v: 200, l: '200명 안팎' },
+      { v: 300, l: '300명 이상' },
+      { v: null, l: '아직 모르겠어요' },
+    ],
+  },
+  {
+    key: 'pyebaek',
+    title: '폐백을\n하시나요?',
+    sub: '폐백실 없는 홀을 표시해드릴게요',
+    options: [
+      { v: 'yes', l: '할 거예요' },
+      { v: 'no', l: '안 할래요' },
+      { v: 'unknown', l: '아직 모르겠어요' },
+    ],
+  },
+];
+
+const TOTAL_STEPS = QUESTIONS.length;
+
+function stepChrome(i, backHash) {
+  const pct = Math.round(((i + 1) / TOTAL_STEPS) * 100);
+  return `
+    <div class="ob-top">
+      <button class="ob-back" id="ob-back" aria-label="뒤로">‹</button>
+      <span class="ob-count">${i + 1} / ${TOTAL_STEPS}</span>
+    </div>
+    <div class="ob-bar"><i style="width:${pct}%"></i></div>
+    <input type="hidden" id="ob-back-to" value="${backHash}" />`;
+}
+
+function questionView(i) {
+  const q = QUESTIONS[i];
+  if (!q) return (location.hash = '#/start/done');
+  const backHash = i === 0 ? '' : `#/start/${i}`;
+
+  app.innerHTML = `
+    ${stepChrome(i, backHash)}
+    <h1 class="ob-q">${esc(q.title).replace(/\n/g, '<br />')}</h1>
+    ${q.sub ? `<p class="ob-sub">${esc(q.sub)}</p>` : '<div style="height:14px"></div>'}
+    <div class="ob-opts">
+      ${q.options
+        .map((o, k) => `<button class="ob-opt" data-k="${k}">${esc(o.l)}</button>`)
+        .join('')}
+    </div>
+    <button class="linkish ob-skip" id="skip">건너뛰고 바로 시작하기</button>
+  `;
+
+  $('#ob-back').onclick = () => {
+    if (backHash) location.hash = backHash;
+    else history.length > 1 ? history.back() : (location.hash = '#/start/1');
+  };
+  $('#skip').onclick = () => { store.finishOnboarding(); location.hash = '#/'; };
+
+  app.querySelectorAll('.ob-opt').forEach((btn) => {
+    btn.onclick = () => {
+      const o = q.options[Number(btn.dataset.k)];
+      store.setProfile({ [q.key]: o.v });
+      if (o.next === 'date') return (location.hash = `#/start/${i + 1}-date`);
+      location.hash = i + 1 < TOTAL_STEPS ? `#/start/${i + 2}` : '#/start/done';
+    };
+  });
+}
+
+// 날짜 입력은 앞 질문의 후속 화면이라 진행 번호를 차지하지 않는다
+function dateView(i) {
+  const p = store.profile();
+  app.innerHTML = `
+    ${stepChrome(i, `#/start/${i + 1}`)}
+    <h1 class="ob-q">언제인가요?</h1>
+    <p class="ob-sub">${p.ceremonyDateStatus === 'tentative' ? '가예약한 날짜를 적어주세요' : '확정된 날짜를 적어주세요'}</p>
+    <div class="card">
+      <div class="row">
+        <label for="cd">결혼식 날짜</label>
+        <input id="cd" type="date" value="${esc(p.ceremonyDate)}" />
+      </div>
+    </div>
+    <div class="sticky">
+      <button class="btn btn-primary" id="next">다음</button>
+      <button class="linkish ob-skip" id="later">나중에 입력할게요</button>
+    </div>
+  `;
+  const go = () => (location.hash = i + 1 < TOTAL_STEPS ? `#/start/${i + 2}` : '#/start/done');
+  $('#ob-back').onclick = () => (location.hash = `#/start/${i + 1}`);
+  $('#next').onclick = () => { store.setProfile({ ceremonyDate: $('#cd').value }); go(); };
+  $('#later').onclick = go;
+}
+
+function doneView() {
+  const p = store.profile();
+  store.finishOnboarding();
+  const d = daysToCeremony(p);
+
+  const lines = [];
+  if (d !== null) {
+    lines.push(`<div class="row do"><span class="k">결혼식까지</span><span class="v">D-${d}</span></div>`);
+  }
+  if (p.guestEstimate) {
+    lines.push(`<div class="row do"><span class="k">보증인원 기본값</span><span class="v">${p.guestEstimate}명</span></div>`);
+  }
+  if (p.pyebaek === 'yes') {
+    lines.push(`<div class="row do"><span class="k">폐백실 없는 홀</span><span class="v">표시해드려요</span></div>`);
+  }
+
+  // 자료 기준 판단 — 최소 10개월 전 예약
+  let lead = '';
+  if (d !== null && p.venueStatus !== 'contracted') {
+    lead = d < VENUE_LEAD_DAYS
+      ? `<div class="card notice"><p><b>웨딩홀부터 서둘러 알아보세요.</b></p>
+         <p>자료 기준 웨딩홀은 최소 10개월 전 예약이에요.
+            지금 ${Math.floor(d / 30)}개월 남았습니다.</p></div>`
+      : `<div class="card notice ok"><p><b>웨딩홀 알아보기 좋은 시기예요.</b></p>
+         <p>자료 기준 최소 10개월 전 예약이고, 지금 ${Math.floor(d / 30)}개월 남았습니다.</p></div>`;
+  }
+
+  const cta = p.venueStatus === 'none'
+    ? { hash: '#/guide', label: '투어에서 물어볼 것 보기' }
+    : { hash: '#/new', label: '웨딩홀 기록 시작하기' };
+
+  app.innerHTML = `
+    ${brand()}
+    <h1 class="hero">준비됐어요</h1>
+    <p class="hero-sub">답해주신 내용은 언제든 바꿀 수 있어요.</p>
+    ${lines.length ? `<div class="card">${lines.join('')}</div>` : ''}
+    ${lead}
+    <div class="sticky">
+      <button class="btn btn-primary" id="go">${cta.label}</button>
+      <button class="linkish ob-skip" id="home">둘러보기</button>
+    </div>
+  `;
+  $('#go').onclick = () => (location.hash = cta.hash);
+  $('#home').onclick = () => (location.hash = '#/');
+}
+
+// ── 기록이 없을 때 ───────────────────────────────────────────────────────
+// 온보딩을 마쳤어도 기록은 0곳이다. 빈 표를 보여주는 대신
+// 이 화면이 "이게 뭔지 · 지금 뭘 하면 되는지"를 말한다.
+// 온보딩을 건너뛴 사람에게는 이 화면이 첫 화면이 된다.
 function introView() {
   app.innerHTML = `
     ${brand()}
@@ -141,9 +306,22 @@ function listView() {
 
   const hasSample = venues.some((v) => v.sample);
 
+  const p = store.profile();
+  const d = daysToCeremony(p);
+  const dday = d === null ? '' : `
+    <div class="dday">
+      <span class="n">D-${d}</span>
+      <span class="t">${esc(dateLabel(p.ceremonyDate))}${
+        p.ceremonyDateStatus === 'tentative' ? ' · 가예약' : ''
+      }</span>
+      ${d < VENUE_LEAD_DAYS && p.venueStatus !== 'contracted'
+        ? '<span class="warn">자료 기준 웨딩홀은 10개월 전 예약</span>' : ''}
+    </div>`;
+
   app.innerHTML = `
     ${brand('웨딩홀')}
     <p class="sub">투어하면서 적은 것을 나란히 봅니다</p>
+    ${dday}
 
     ${hasSample ? `
       <div class="card notice sample">
@@ -170,7 +348,7 @@ function listView() {
     <button class="btn btn-ghost" id="add" style="margin-top:14px">＋ 웨딩홀 기록하기</button>
 
     ${venues.length >= 2
-      ? compareTable(venues)
+      ? compareTable(venues) + pyebaekWarning(venues)
       : `<p class="note">한 곳 더 기록하면 <b>비교표</b>가 나타납니다.</p>`}
 
     <div class="btn-row">
@@ -182,12 +360,14 @@ function listView() {
     <p class="note">
       앱은 순위를 매기거나 추천하지 않아요. 적어두신 것을 나란히 놓아드릴 뿐이에요.<br />
       기록은 <b>이 브라우저에만</b> 저장돼요. 다른 기기에서 보시려면 내보내기를 쓰세요.<br />
-      <button class="linkish" id="guide">투어에서 물어볼 것 다시 보기</button>
+      <button class="linkish" id="guide">투어에서 물어볼 것 다시 보기</button> ·
+      <button class="linkish" id="redo">처음 답한 내용 수정</button>
     </p>
   `;
 
   $('#add').onclick = () => (location.hash = '#/new');
   $('#guide').onclick = () => (location.hash = '#/guide');
+  $('#redo').onclick = () => (location.hash = '#/start/1');
   app.querySelectorAll('[data-go]').forEach((b) => {
     b.onclick = () => (location.hash = '#/v/' + b.dataset.go);
   });
@@ -199,6 +379,17 @@ function listView() {
       if (confirm('예시 데이터를 지울까요?')) { store.clearSample(); render(); }
     };
   }
+}
+
+// 앱이 판단하지 않는다. 본인이 답한 것과 적어둔 것이 어긋나는 지점만 알린다.
+function pyebaekWarning(venues) {
+  if (store.profile().pyebaek !== 'yes') return '';
+  const bad = venues.filter((v) => v.pyebaekRoom === 'no');
+  if (!bad.length) return '';
+  return `<div class="card notice">
+    <p><b>${bad.map((v) => esc(v.name || '이름 없는 홀')).join(' · ')}</b>에는 폐백실이 없어요.</p>
+    <p>폐백을 하기로 답하셨어요. 어느 쪽을 고르실지는 직접 판단하세요.</p>
+  </div>`;
 }
 
 function compareTable(venues) {
@@ -288,6 +479,9 @@ function editView(id) {
       ${moneyRow('꽃장식', 'flowers')}
       ${moneyRow('식대 (1인)', 'mealPrice')}
       ${moneyRow('보증인원', 'guarantee', '명')}
+      ${store.profile().guestEstimate && (v.guarantee === null || v.guarantee === '')
+        ? `<div class="row hintrow"><span class="k">예상 하객 ${store.profile().guestEstimate}명으로 답하셨어요</span>
+             <button class="linkish" id="use-guest">${store.profile().guestEstimate} 넣기</button></div>` : ''}
       <div class="row total"><span class="k"><b>예상 합계</b></span><span class="v" id="total"></span></div>
     </div>
     <p class="formula">홀 사용료 + 꽃장식 + (보증인원 × 식대) · 보증인원은 2~3주 전 최종 결정</p>
@@ -333,6 +527,15 @@ function editView(id) {
   };
 
   const persist = () => { store.save(v); };
+
+  const useGuest = $('#use-guest');
+  if (useGuest) {
+    useGuest.onclick = () => {
+      v.guarantee = store.profile().guestEstimate;
+      persist();
+      editView(v.id);   // 다시 그려서 입력칸에 반영
+    };
+  }
 
   app.querySelectorAll('[data-k]').forEach((el) => {
     el.oninput = () => {
@@ -420,6 +623,18 @@ async function doImport(e) {
 function render() {
   const h = location.hash;
   scrollTo(0, 0);
+
+  // 온보딩
+  if (h.startsWith('#/start')) {
+    const m = h.match(/^#\/start\/(\d+)(-date)?$/);
+    if (h === '#/start/done') return doneView();
+    if (m) return m[2] ? dateView(Number(m[1]) - 1) : questionView(Number(m[1]) - 1);
+    return (location.hash = '#/start/1');
+  }
+
+  // 첫 방문이면 온보딩부터
+  if (!store.onboarded() && !store.venues().length) return (location.hash = '#/start/1');
+
   if (h === '#/guide') return guideView();
   if (h === '#/new') return editView(null);
   if (h.startsWith('#/v/')) return editView(h.slice(4));

@@ -202,3 +202,48 @@ h1.hero.sm { font-size: 21px; margin-top: 6px; }
   border: 0; background: none; padding: 0; font: inherit; font-size: 11px;
   color: var(--rose); text-decoration: underline; cursor: pointer;
 }
+
+/* ── 온보딩 (한 화면 한 질문) ─────────────────────────── */
+.ob-top { display: flex; align-items: center; justify-content: space-between; padding: 24px 0 10px; }
+.ob-back {
+  border: 0; background: none; font: inherit; font-size: 26px; line-height: 1;
+  color: var(--ink); padding: 0 8px 0 0; margin-left: -4px; cursor: pointer;
+}
+.ob-count { font-size: 11.5px; font-weight: 600; color: var(--mute); }
+.ob-bar { height: 3px; background: var(--line); border-radius: 2px; overflow: hidden; }
+.ob-bar i { display: block; height: 100%; background: var(--rose); border-radius: 2px;
+            transition: width 0.25s ease; }
+
+h1.ob-q { font-size: 24px; line-height: 1.42; margin: 40px 0 0; letter-spacing: -0.02em; }
+.ob-sub { color: var(--mute); font-size: 12.5px; line-height: 1.6; margin: 12px 0 0; }
+
+.ob-opts { display: flex; flex-direction: column; gap: 10px; margin-top: 30px; }
+.ob-opt {
+  width: 100%; text-align: left; background: var(--card);
+  border: 1px solid var(--line); border-radius: 16px;
+  padding: 18px 20px; font: inherit; font-size: 15px; font-weight: 600;
+  color: var(--ink); cursor: pointer;
+}
+.ob-opt:active { background: var(--field); border-color: #ddd4cc; }
+
+.ob-skip { display: block; margin: 26px auto 0; font-size: 12px; text-decoration: none; }
+.sticky .ob-skip { margin-top: 12px; }
+
+.card.notice.ok { background: #f1f5f1; border-color: #dde7dd; }
+.card.notice.ok p { color: #4f6b50; }
+
+/* ── D-day ────────────────────────────────────────────── */
+.dday {
+  background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 15px 18px; margin-bottom: 16px;
+  display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
+}
+.dday .n { font-size: 20px; font-weight: 700; color: var(--rose); letter-spacing: -0.01em; }
+.dday .t { font-size: 12px; color: var(--mute); }
+.dday .warn {
+  flex-basis: 100%; font-size: 11px; color: var(--rose);
+  background: var(--rose-bg); border-radius: 8px; padding: 6px 9px; margin-top: 4px;
+}
+
+.row.hintrow { background: var(--field); }
+.row.hintrow .k { font-size: 11.5px; color: var(--mute); }
